@@ -14,12 +14,16 @@
 #include <vector>
 
 #include "lldb/lldb-public.h"
+#include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace lldb_private {
 namespace process_gdb_remote {
 
 class GDBRemoteCommunicationHistory {
 public:
+  friend llvm::yaml::MappingTraits<GDBRemoteCommunicationHistory>;
+
   enum PacketType { ePacketTypeInvalid = 0, ePacketTypeSend, ePacketTypeRecv };
 
   struct Entry {
@@ -42,7 +46,7 @@ public:
     lldb::tid_t tid;
   };
 
-  GDBRemoteCommunicationHistory(uint32_t size);
+  GDBRemoteCommunicationHistory(uint32_t size = 0);
 
   ~GDBRemoteCommunicationHistory();
 
@@ -53,12 +57,14 @@ public:
                  uint32_t bytes_transmitted);
 
   void Dump(Stream &strm) const;
-
   void Dump(Log *log) const;
-
   bool DidDumpToLog() const { return m_dumped_to_log; }
 
-protected:
+  void Serialize(llvm::raw_ostream &strm) const;
+  static llvm::Expected<GDBRemoteCommunicationHistory>
+  Deserialize(const ConstString &path);
+
+private:
   uint32_t GetFirstSavedPacketIndex() const {
     if (m_total_packet_count < m_packets.size())
       return 0;
@@ -90,5 +96,42 @@ protected:
 
 } // namespace process_gdb_remote
 } // namespace lldb_private
+
+LLVM_YAML_IS_SEQUENCE_VECTOR(
+    lldb_private::process_gdb_remote::GDBRemoteCommunicationHistory::Entry)
+
+namespace llvm {
+namespace yaml {
+
+using namespace lldb_private::process_gdb_remote;
+
+template <>
+struct ScalarEnumerationTraits<GDBRemoteCommunicationHistory::PacketType> {
+  static void enumeration(IO &io,
+                          GDBRemoteCommunicationHistory::PacketType &value) {
+    io.enumCase(value, "Invalid",
+                GDBRemoteCommunicationHistory::ePacketTypeInvalid);
+    io.enumCase(value, "Send", GDBRemoteCommunicationHistory::ePacketTypeSend);
+    io.enumCase(value, "Recv", GDBRemoteCommunicationHistory::ePacketTypeRecv);
+  }
+};
+
+template <> struct MappingTraits<GDBRemoteCommunicationHistory::Entry> {
+  static void mapping(IO &io, GDBRemoteCommunicationHistory::Entry &Entry) {
+    io.mapRequired("packet", Entry.packet);
+    io.mapRequired("type", Entry.type);
+    io.mapRequired("bytes", Entry.bytes_transmitted);
+    io.mapRequired("index", Entry.packet_idx);
+    io.mapRequired("tid", Entry.tid);
+  }
+};
+
+template <> struct MappingTraits<GDBRemoteCommunicationHistory> {
+  static void mapping(IO &io, GDBRemoteCommunicationHistory &History) {
+    io.mapRequired("packets", History.m_packets);
+  }
+};
+} // namespace yaml
+} // namespace llvm
 
 #endif // liblldb_GDBRemoteCommunicationHistory_h_

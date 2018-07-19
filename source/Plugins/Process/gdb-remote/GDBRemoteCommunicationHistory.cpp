@@ -11,8 +11,10 @@
 
 // Other libraries and framework includes
 #include "lldb/Core/StreamFile.h"
+#include "lldb/Utility/ConstString.h"
 #include "lldb/Utility/Log.h"
 
+using namespace llvm;
 using namespace lldb;
 using namespace lldb_private;
 using namespace lldb_private::process_gdb_remote;
@@ -20,7 +22,8 @@ using namespace lldb_private::process_gdb_remote;
 GDBRemoteCommunicationHistory::GDBRemoteCommunicationHistory(uint32_t size)
     : m_packets(), m_curr_idx(0), m_total_packet_count(0),
       m_dumped_to_log(false) {
-  m_packets.resize(size);
+  if (size)
+    m_packets.resize(size);
 }
 
 GDBRemoteCommunicationHistory::~GDBRemoteCommunicationHistory() {}
@@ -85,4 +88,26 @@ void GDBRemoteCommunicationHistory::Dump(Log *log) const {
                   entry.packet.c_str());
     }
   }
+}
+
+void GDBRemoteCommunicationHistory::Serialize(raw_ostream &strm) const {
+  yaml::Output yout(strm, /* Ctxt = */ nullptr, /* WrapColumn = */ 0);
+  yout << const_cast<GDBRemoteCommunicationHistory &>(*this);
+}
+
+llvm::Expected<GDBRemoteCommunicationHistory>
+GDBRemoteCommunicationHistory::Deserialize(const ConstString &path) {
+  auto error_or_file = MemoryBuffer::getFile(path.GetStringRef());
+  if (auto err = error_or_file.getError())
+    return errorCodeToError(err);
+
+  GDBRemoteCommunicationHistory history;
+
+  yaml::Input yin((*error_or_file)->getBuffer());
+  yin >> history;
+
+  if (auto err = yin.error())
+    return errorCodeToError(err);
+
+  return history;
 }
