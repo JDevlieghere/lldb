@@ -39,6 +39,8 @@ public:
       tid = LLDB_INVALID_THREAD_ID;
     }
 
+    void Serialize(llvm::raw_ostream &strm) const;
+
     std::string packet;
     PacketType type;
     uint32_t bytes_transmitted;
@@ -60,9 +62,9 @@ public:
   void Dump(Log *log) const;
   bool DidDumpToLog() const { return m_dumped_to_log; }
 
-  void Serialize(llvm::raw_ostream &strm) const;
-  static llvm::Expected<GDBRemoteCommunicationHistory>
-  Deserialize(const ConstString &path);
+  void SetStream(std::unique_ptr<llvm::raw_ostream> strm) {
+    m_stream_up = std::move(strm);
+  }
 
 private:
   uint32_t GetFirstSavedPacketIndex() const {
@@ -92,6 +94,7 @@ private:
   uint32_t m_curr_idx;
   uint32_t m_total_packet_count;
   mutable bool m_dumped_to_log;
+  std::unique_ptr<llvm::raw_ostream> m_stream_up;
 };
 
 } // namespace process_gdb_remote
@@ -123,12 +126,6 @@ template <> struct MappingTraits<GDBRemoteCommunicationHistory::Entry> {
     io.mapRequired("bytes", Entry.bytes_transmitted);
     io.mapRequired("index", Entry.packet_idx);
     io.mapRequired("tid", Entry.tid);
-  }
-};
-
-template <> struct MappingTraits<GDBRemoteCommunicationHistory> {
-  static void mapping(IO &io, GDBRemoteCommunicationHistory &History) {
-    io.mapRequired("packets", History.m_packets);
   }
 };
 } // namespace yaml

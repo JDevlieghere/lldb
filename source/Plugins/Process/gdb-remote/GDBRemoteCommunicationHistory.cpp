@@ -19,6 +19,11 @@ using namespace lldb;
 using namespace lldb_private;
 using namespace lldb_private::process_gdb_remote;
 
+void GDBRemoteCommunicationHistory::Entry::Serialize(raw_ostream &strm) const {
+  yaml::Output yout(strm);
+  yout << const_cast<GDBRemoteCommunicationHistory::Entry &>(*this);
+}
+
 GDBRemoteCommunicationHistory::GDBRemoteCommunicationHistory(uint32_t size)
     : m_packets(), m_curr_idx(0), m_total_packet_count(0),
       m_dumped_to_log(false) {
@@ -38,6 +43,8 @@ void GDBRemoteCommunicationHistory::AddPacket(char packet_char, PacketType type,
     m_packets[idx].bytes_transmitted = bytes_transmitted;
     m_packets[idx].packet_idx = m_total_packet_count;
     m_packets[idx].tid = llvm::get_threadid();
+    if (m_stream_up)
+      m_packets[idx].Serialize(*m_stream_up);
   }
 }
 
@@ -52,6 +59,8 @@ void GDBRemoteCommunicationHistory::AddPacket(const std::string &src,
     m_packets[idx].bytes_transmitted = bytes_transmitted;
     m_packets[idx].packet_idx = m_total_packet_count;
     m_packets[idx].tid = llvm::get_threadid();
+    if (m_stream_up)
+      m_packets[idx].Serialize(*m_stream_up);
   }
 }
 
@@ -88,26 +97,4 @@ void GDBRemoteCommunicationHistory::Dump(Log *log) const {
                   entry.packet.c_str());
     }
   }
-}
-
-void GDBRemoteCommunicationHistory::Serialize(raw_ostream &strm) const {
-  yaml::Output yout(strm, /* Ctxt = */ nullptr, /* WrapColumn = */ 0);
-  yout << const_cast<GDBRemoteCommunicationHistory &>(*this);
-}
-
-llvm::Expected<GDBRemoteCommunicationHistory>
-GDBRemoteCommunicationHistory::Deserialize(const ConstString &path) {
-  auto error_or_file = MemoryBuffer::getFile(path.GetStringRef());
-  if (auto err = error_or_file.getError())
-    return errorCodeToError(err);
-
-  GDBRemoteCommunicationHistory history;
-
-  yaml::Input yin((*error_or_file)->getBuffer());
-  yin >> history;
-
-  if (auto err = yin.error())
-    return errorCodeToError(err);
-
-  return history;
 }

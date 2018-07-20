@@ -88,6 +88,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUGSERVER_BASENAME "debugserver"
+using namespace llvm;
 using namespace lldb;
 using namespace lldb_private;
 using namespace lldb_private::process_gdb_remote;
@@ -267,6 +268,15 @@ ProcessGDBRemote::ProcessGDBRemote(lldb::TargetSP target_sp,
                                    "async thread continue");
   m_async_broadcaster.SetEventName(eBroadcastBitAsyncThreadDidExit,
                                    "async thread did exit");
+
+  if (GetTarget().GetDebugger().GetGenerateReproducer()) {
+    // FIXME: Don't hard code path.
+    std::error_code EC;
+    auto file_out = make_unique<raw_fd_ostream>("/tmp/gdb-remove.yaml", EC,
+                                                sys::fs::OpenFlags::F_None);
+    if (!EC)
+      m_gdb_comm.SetHistoryStream(std::move(file_out));
+  }
 
   Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_ASYNC));
 

@@ -141,6 +141,7 @@ public:
                          // fork/exec to avoid having to connect/accept
 
   void DumpHistory(Stream &strm);
+  void SetHistoryStream(std::unique_ptr<llvm::raw_ostream> strm);
 
 protected:
   std::chrono::seconds m_packet_timeout;
