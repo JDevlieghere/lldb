@@ -300,6 +300,10 @@ public:
 
   bool SetTabSize(uint32_t tab_size);
 
+  bool GetGenerateReproducer() const;
+
+  bool SetGenerateReproducer(bool b);
+
   bool GetEscapeNonPrintables() const;
 
   bool GetNotifyVoid() const;

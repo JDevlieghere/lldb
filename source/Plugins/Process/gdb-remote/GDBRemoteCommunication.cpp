@@ -1236,6 +1236,11 @@ Status GDBRemoteCommunication::StartDebugserverProcess(
 
 void GDBRemoteCommunication::DumpHistory(Stream &strm) { m_history.Dump(strm); }
 
+void GDBRemoteCommunication::SetHistoryStream(
+    std::unique_ptr<llvm::raw_ostream> strm) {
+  m_history.SetStream(std::move(strm));
+};
+
 GDBRemoteCommunication::ScopedTimeout::ScopedTimeout(
     GDBRemoteCommunication &gdb_comm, std::chrono::seconds timeout)
   : m_gdb_comm(gdb_comm), m_timeout_modified(false) {
