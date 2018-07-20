@@ -288,7 +288,9 @@ static PropertyDefinition g_properties[] = {
     {nullptr, OptionValue::eTypeInvalid, true, 0, nullptr, nullptr, nullptr},
     {"generate-reproducer", OptionValue::eTypeBoolean, true, true, nullptr,
      nullptr,
-     "If true, LLDB will generate files to reproduce the current session."}};
+     "If true, LLDB will generate files to reproduce the current session."},
+    {"reproducer", OptionValue::eTypeString, false, 0, nullptr, nullptr,
+     "If set, LLDB will replay the session from the provided reproducer."}};
 
 enum {
   ePropertyAutoConfirm = 0,
@@ -317,6 +319,7 @@ enum {
   ePropertyEscapeNonPrintables,
   ePropertyFrameFormatUnique,
   ePropertyGenerateReproducer,
+  ePropertyReproducer,
 };
 
 LoadPluginCallbackType Debugger::g_load_plugin_callback = nullptr;
@@ -568,6 +571,17 @@ bool Debugger::GetGenerateReproducer() const {
 bool Debugger::SetGenerateReproducer(bool b) {
   const uint32_t idx = ePropertyGenerateReproducer;
   return m_collection_sp->SetPropertyAtIndexAsBoolean(nullptr, idx, b);
+}
+
+llvm::StringRef Debugger::GetReproducer() const {
+  const uint32_t idx = ePropertyReproducer;
+  return m_collection_sp->GetPropertyAtIndexAsString(
+      nullptr, idx, g_properties[idx].default_cstr_value);
+}
+
+void Debugger::SetReproducer(llvm::StringRef p) {
+  const uint32_t idx = ePropertyReproducer;
+  m_collection_sp->SetPropertyAtIndexAsString(nullptr, idx, p);
 }
 
 #pragma mark Debugger
