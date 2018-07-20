@@ -119,20 +119,23 @@ size_t GDBRemoteCommunication::SendNack() {
 
 GDBRemoteCommunication::PacketResult
 GDBRemoteCommunication::SendPacketNoLock(llvm::StringRef payload) {
-  if (IsConnected()) {
     StreamString packet(0, 4, eByteOrderBig);
-
     packet.PutChar('$');
     packet.Write(payload.data(), payload.size());
     packet.PutChar('#');
     packet.PutHex8(CalculcateChecksum(payload));
+    std::string packet_str = packet.GetString();
 
+    return SendRawPacketNoLock(packet_str);
+}
+
+GDBRemoteCommunication::PacketResult
+GDBRemoteCommunication::SendRawPacketNoLock(llvm::StringRef packet) {
+  if (IsConnected()) {
     Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_PACKETS));
     ConnectionStatus status = eConnectionStatusSuccess;
-    // TODO: Don't shimmy through a std::string, just use StringRef.
-    std::string packet_str = packet.GetString();
-    const char *packet_data = packet_str.c_str();
-    const size_t packet_length = packet.GetSize();
+    const char *packet_data = packet.data();
+    const size_t packet_length = packet.size();
     size_t bytes_written = Write(packet_data, packet_length, status, NULL);
     if (log) {
       size_t binary_start_offset = 0;
@@ -171,7 +174,7 @@ GDBRemoteCommunication::SendPacketNoLock(llvm::StringRef payload) {
                     (int)packet_length, packet_data);
     }
 
-    m_history.AddPacket(packet.GetString(), packet_length,
+    m_history.AddPacket(packet.str(), packet_length,
                         GDBRemoteCommunicationHistory::ePacketTypeSend,
                         bytes_written);
 
