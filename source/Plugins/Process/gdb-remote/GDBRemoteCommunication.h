@@ -143,6 +143,9 @@ public:
   void DumpHistory(Stream &strm);
   void SetHistoryStream(std::unique_ptr<llvm::raw_ostream> strm);
 
+  static llvm::Error ConnectLocally(GDBRemoteCommunication &client,
+                                    GDBRemoteCommunication &server);
+
 protected:
   std::chrono::seconds m_packet_timeout;
   uint32_t m_echo_number;

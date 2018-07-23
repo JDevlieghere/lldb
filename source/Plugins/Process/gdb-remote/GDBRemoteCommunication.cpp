@@ -10,6 +10,7 @@
 #include "GDBRemoteCommunication.h"
 
 // C Includes
+#include <future>
 #include <limits.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -24,6 +25,8 @@
 #include "lldb/Host/Socket.h"
 #include "lldb/Host/StringConvert.h"
 #include "lldb/Host/ThreadLauncher.h"
+#include "lldb/Host/common/TCPSocket.h"
+#include "lldb/Host/posix/ConnectionFileDescriptorPosix.h"
 #include "lldb/Target/Platform.h"
 #include "lldb/Target/Process.h"
 #include "lldb/Utility/FileSpec.h"
@@ -1243,6 +1246,36 @@ void GDBRemoteCommunication::SetHistoryStream(
     std::unique_ptr<llvm::raw_ostream> strm) {
   m_history.SetStream(std::move(strm));
 };
+
+llvm::Error
+GDBRemoteCommunication::ConnectLocally(GDBRemoteCommunication &client,
+                                       GDBRemoteCommunication &server) {
+  const bool child_processes_inherit = false;
+  TCPSocket listen_socket(true, child_processes_inherit);
+  if (llvm::Error error = listen_socket.Listen("127.0.0.1:0", 5).ToError())
+    return error;
+
+  Socket *accept_socket;
+  std::future<Status> accept_status = std::async(
+      std::launch::async, [&] { return listen_socket.Accept(accept_socket); });
+
+  llvm::SmallString<32> remote_addr;
+  llvm::raw_svector_ostream(remote_addr)
+      << "connect://localhost:" << listen_socket.GetLocalPortNumber();
+
+  std::unique_ptr<ConnectionFileDescriptor> conn_up(
+      new ConnectionFileDescriptor());
+  if (conn_up->Connect(remote_addr, nullptr) != lldb::eConnectionStatusSuccess)
+    return llvm::make_error<llvm::StringError>("Unable to connect",
+                                               llvm::inconvertibleErrorCode());
+
+  client.SetConnection(conn_up.release());
+  if (llvm::Error error = accept_status.get().ToError())
+    return error;
+
+  server.SetConnection(new ConnectionFileDescriptor(accept_socket));
+  return llvm::Error::success();
+}
 
 GDBRemoteCommunication::ScopedTimeout::ScopedTimeout(
     GDBRemoteCommunication &gdb_comm, std::chrono::seconds timeout)
