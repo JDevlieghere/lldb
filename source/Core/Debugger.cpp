@@ -283,12 +283,12 @@ static PropertyDefinition g_properties[] = {
      DEFAULT_FRAME_FORMAT_NO_ARGS, nullptr,
      "The default frame format string to use when displaying stack frame"
      "information for threads from thread backtrace unique."},
-    {nullptr, OptionValue::eTypeInvalid, true, 0, nullptr, nullptr, nullptr},
     {"generate-reproducer", OptionValue::eTypeBoolean, true, true, nullptr,
      nullptr,
      "If true, LLDB will generate files to reproduce the current session."},
     {"reproducer", OptionValue::eTypeString, false, 0, nullptr, nullptr,
-     "If set, LLDB will replay the session from the provided reproducer."}};
+     "If set, LLDB will replay the session from the provided reproducer."},
+    {nullptr, OptionValue::eTypeInvalid, true, 0, nullptr, nullptr, nullptr}};
 
 enum {
   ePropertyAutoConfirm = 0,
@@ -556,7 +556,8 @@ bool Debugger::SetTabSize(uint32_t tab_size) {
 
 bool Debugger::GetGenerateReproducer() const {
   const uint32_t idx = ePropertyGenerateReproducer;
-  return m_collection_sp->GetPropertyAtIndexAsBoolean(nullptr, idx, true);
+  return m_collection_sp->GetPropertyAtIndexAsBoolean(
+      nullptr, idx, g_properties[idx].default_uint_value != 0);
 }
 
 bool Debugger::SetGenerateReproducer(bool b) {

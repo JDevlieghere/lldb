@@ -25,26 +25,6 @@ void GDBRemoteCommunicationHistory::Entry::Serialize(raw_ostream &strm) const {
   yout << const_cast<GDBRemoteCommunicationHistory::Entry &>(*this);
 }
 
-llvm::Expected<std::vector<GDBRemoteCommunicationHistory::Entry>>
-Deserialize(const FileSpec &path) {
-  auto error_or_file = MemoryBuffer::getFile(path.GetPath());
-  if (auto err = error_or_file.getError())
-    return errorCodeToError(err);
-
-  std::vector<GDBRemoteCommunicationHistory::Entry> entries;
-  yaml::Input yin((*error_or_file)->getBuffer());
-  yin >> entries;
-
-  if (auto err = yin.error())
-    return errorCodeToError(err);
-
-  // We'll want to manipulate the vector like a stack so we need to reverse the
-  // order of the packets to have the oldest on at the back.
-  std::reverse(entries.begin(), entries.end());
-
-  return entries;
-}
-
 GDBRemoteCommunicationHistory::GDBRemoteCommunicationHistory(uint32_t size)
     : m_packets(), m_curr_idx(0), m_total_packet_count(0),
       m_dumped_to_log(false) {
@@ -52,7 +32,10 @@ GDBRemoteCommunicationHistory::GDBRemoteCommunicationHistory(uint32_t size)
     m_packets.resize(size);
 }
 
-GDBRemoteCommunicationHistory::~GDBRemoteCommunicationHistory() {}
+GDBRemoteCommunicationHistory::~GDBRemoteCommunicationHistory() {
+  if (m_stream_up)
+    m_stream_up->flush();
+}
 
 void GDBRemoteCommunicationHistory::AddPacket(char packet_char, PacketType type,
                                               uint32_t bytes_transmitted) {

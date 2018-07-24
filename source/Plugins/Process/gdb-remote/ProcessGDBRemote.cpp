@@ -269,16 +269,34 @@ ProcessGDBRemote::ProcessGDBRemote(lldb::TargetSP target_sp,
   m_async_broadcaster.SetEventName(eBroadcastBitAsyncThreadDidExit,
                                    "async thread did exit");
 
-  if (GetTarget().GetDebugger().GetGenerateReproducer()) {
+  Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_ASYNC));
+
+  StringRef reproducer = GetTarget().GetDebugger().GetReproducer();
+
+  // Don't generate a reproducer when we're replaying.
+  if (GetTarget().GetDebugger().GetGenerateReproducer() && reproducer.empty()) {
     // FIXME: Don't hard code path.
     std::error_code EC;
-    auto file_out = make_unique<raw_fd_ostream>("/tmp/gdb-remove.yaml", EC,
-                                                sys::fs::OpenFlags::F_None);
+    auto file_out = make_unique<raw_fd_ostream>("/tmp/gdb-remote.yaml", EC);
     if (!EC)
       m_gdb_comm.SetHistoryStream(std::move(file_out));
+    else if (log)
+      log->Printf("ProcessGDBRemote::%s failed to generate reproducer",
+                  __FUNCTION__);
   }
 
-  Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_ASYNC));
+  // If we're in reproducer mode, try loading the history and hook up the
+  // client with the replay server.
+  if (!reproducer.empty()) {
+    FileSpec history_file(reproducer, true);
+    history_file.AppendPathComponent("gdb-remote.yaml");
+    if (auto error = m_gdb_comm.LoadReplayHistory(history_file)) {
+      if (log)
+        log->Printf("ProcessGDBRemote::%s failed to load replay history",
+                    __FUNCTION__);
+      llvm::consumeError(std::move(error));
+    }
+  }
 
   const uint32_t async_event_mask =
       eBroadcastBitAsyncContinue | eBroadcastBitAsyncThreadShouldExit;

@@ -50,6 +50,7 @@
 #include <zlib.h>
 #endif
 
+using namespace llvm;
 using namespace lldb;
 using namespace lldb_private;
 using namespace lldb_private::process_gdb_remote;
@@ -220,10 +221,38 @@ GDBRemoteCommunication::ReadPacketWithOutputSupport(
 }
 
 GDBRemoteCommunication::PacketResult
+GDBRemoteCommunication::ReadPacketFromReplayHistory(
+    StringExtractorGDBRemote &response) {
+  Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_PACKETS));
+
+  while (!m_replay_history.empty()) {
+    // Pop last packet from the history.
+    GDBRemoteCommunicationHistory::Entry entry = m_replay_history.back();
+    m_replay_history.pop_back();
+
+    // Ignore anything we didn't receive from the server.
+    if (entry.type != GDBRemoteCommunicationHistory::ePacketTypeRecv)
+      continue;
+
+    // Copy the packet into the response.
+    response = StringExtractorGDBRemote(entry.packet);
+
+    if (log)
+      log->Printf("GDBRemoteCommunication::%s replied '%s' from replay history",
+                  __FUNCTION__, entry.packet.c_str());
+
+    return PacketResult::Success;
+  }
+  return PacketResult::ErrorDisconnected;
+}
+
+GDBRemoteCommunication::PacketResult
 GDBRemoteCommunication::ReadPacket(StringExtractorGDBRemote &response,
                                    Timeout<std::micro> timeout,
                                    bool sync_on_timeout) {
-  if (m_read_thread_enabled)
+  if (!m_replay_history.empty()) {
+    return ReadPacketFromReplayHistory(response);
+  } else if (m_read_thread_enabled)
     return PopPacketFromQueue(response, timeout);
   else
     return WaitForPacketNoLock(response, timeout, sync_on_timeout);
@@ -1241,16 +1270,39 @@ void GDBRemoteCommunication::SetHistoryStream(
   m_history.SetStream(std::move(strm));
 };
 
+llvm::Error GDBRemoteCommunication::LoadReplayHistory(const FileSpec &path) {
+  auto error_or_file = MemoryBuffer::getFile(path.GetPath());
+  if (auto err = error_or_file.getError())
+    return errorCodeToError(err);
+
+  yaml::Input yin((*error_or_file)->getBuffer());
+  yin >> m_replay_history;
+
+  if (auto err = yin.error())
+    return errorCodeToError(err);
+
+  // We'll want to manipulate the vector like a stack so we need to reverse the
+  // order of the packets to have the oldest on at the back.
+  std::reverse(m_replay_history.begin(), m_replay_history.end());
+
+  Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_PACKETS));
+  if (log)
+    log->Printf("GDBRemoteCommunication::%s loaded %zd replay entries",
+                __FUNCTION__, m_replay_history.size());
+
+  return Error::success();
+}
+
 GDBRemoteCommunication::ScopedTimeout::ScopedTimeout(
     GDBRemoteCommunication &gdb_comm, std::chrono::seconds timeout)
-  : m_gdb_comm(gdb_comm), m_timeout_modified(false) {
-    auto curr_timeout = gdb_comm.GetPacketTimeout();
-    // Only update the timeout if the timeout is greater than the current
-    // timeout. If the current timeout is larger, then just use that.
-    if (curr_timeout < timeout) {
-      m_timeout_modified = true;
-      m_saved_timeout = m_gdb_comm.SetPacketTimeout(timeout);
-    }
+    : m_gdb_comm(gdb_comm), m_timeout_modified(false) {
+  auto curr_timeout = gdb_comm.GetPacketTimeout();
+  // Only update the timeout if the timeout is greater than the current
+  // timeout. If the current timeout is larger, then just use that.
+  if (curr_timeout < timeout) {
+    m_timeout_modified = true;
+    m_saved_timeout = m_gdb_comm.SetPacketTimeout(timeout);
+  }
 }
 
 GDBRemoteCommunication::ScopedTimeout::~ScopedTimeout() {

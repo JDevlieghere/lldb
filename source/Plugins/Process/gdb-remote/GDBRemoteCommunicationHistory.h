@@ -48,8 +48,6 @@ public:
     lldb::tid_t tid;
   };
 
-  static llvm::Expected<std::vector<Entry>> Deserialize(const FileSpec &path);
-
   GDBRemoteCommunicationHistory(uint32_t size = 0);
 
   ~GDBRemoteCommunicationHistory();

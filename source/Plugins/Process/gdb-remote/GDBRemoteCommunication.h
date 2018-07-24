@@ -142,8 +142,10 @@ public:
 
   void DumpHistory(Stream &strm);
   void SetHistoryStream(std::unique_ptr<llvm::raw_ostream> strm);
+  llvm::Error LoadReplayHistory(const FileSpec &path);
 
 protected:
+  std::vector<GDBRemoteCommunicationHistory::Entry> m_replay_history;
   std::chrono::seconds m_packet_timeout;
   uint32_t m_echo_number;
   LazyBool m_supports_qEcho;
@@ -159,6 +161,8 @@ protected:
 
   PacketResult ReadPacket(StringExtractorGDBRemote &response,
                           Timeout<std::micro> timeout, bool sync_on_timeout);
+
+  PacketResult ReadPacketFromReplayHistory(StringExtractorGDBRemote &response);
 
   PacketResult ReadPacketWithOutputSupport(
       StringExtractorGDBRemote &response, Timeout<std::micro> timeout,
