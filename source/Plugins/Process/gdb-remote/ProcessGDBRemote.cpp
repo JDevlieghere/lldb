@@ -107,7 +107,7 @@ void DumpProcessGDBRemotePacketHistory(void *p, const char *path) {
   if (error.Success())
     ((ProcessGDBRemote *)p)->GetGDBRemote().DumpHistory(strm);
 }
-}
+} // namespace lldb
 
 namespace {
 
@@ -159,7 +159,7 @@ static const ProcessKDPPropertiesSP &GetGlobalPluginProperties() {
   return g_settings_sp;
 }
 
-} // anonymous namespace end
+} // namespace
 
 // TODO Randomly assigning a port is unsafe.  We should get an unused
 // ephemeral port from the kernel and make sure we reserve it before passing it
@@ -269,10 +269,11 @@ ProcessGDBRemote::ProcessGDBRemote(lldb::TargetSP target_sp,
   m_async_broadcaster.SetEventName(eBroadcastBitAsyncThreadDidExit,
                                    "async thread did exit");
 
-  if (GetTarget().GetDebugger().GetGenerateReproducer()) {
+  if (GetTarget().GetDebugger().GetGenerateReproducer() &&
+      GetTarget().GetDebugger().GetReproducer().empty()) {
     // FIXME: Don't hard code path.
     std::error_code EC;
-    auto file_out = make_unique<raw_fd_ostream>("/tmp/gdb-remove.yaml", EC,
+    auto file_out = make_unique<raw_fd_ostream>("/tmp/gdb-remote.yaml", EC,
                                                 sys::fs::OpenFlags::F_None);
     if (!EC)
       m_gdb_comm.SetHistoryStream(std::move(file_out));
@@ -1068,9 +1069,10 @@ void ProcessGDBRemote::DidLaunchOrAttach(ArchSpec &process_arch) {
       if (log)
         log->Printf("ProcessGDBRemote::%s gdb-remote had process architecture, "
                     "using %s %s",
-                    __FUNCTION__, process_arch.GetArchitectureName()
-                                      ? process_arch.GetArchitectureName()
-                                      : "<null>",
+                    __FUNCTION__,
+                    process_arch.GetArchitectureName()
+                        ? process_arch.GetArchitectureName()
+                        : "<null>",
                     process_arch.GetTriple().getTriple().c_str()
                         ? process_arch.GetTriple().getTriple().c_str()
                         : "<null>");
@@ -1079,9 +1081,10 @@ void ProcessGDBRemote::DidLaunchOrAttach(ArchSpec &process_arch) {
       if (log)
         log->Printf("ProcessGDBRemote::%s gdb-remote did not have process "
                     "architecture, using gdb-remote host architecture %s %s",
-                    __FUNCTION__, process_arch.GetArchitectureName()
-                                      ? process_arch.GetArchitectureName()
-                                      : "<null>",
+                    __FUNCTION__,
+                    process_arch.GetArchitectureName()
+                        ? process_arch.GetArchitectureName()
+                        : "<null>",
                     process_arch.GetTriple().getTriple().c_str()
                         ? process_arch.GetTriple().getTriple().c_str()
                         : "<null>");
@@ -1093,9 +1096,10 @@ void ProcessGDBRemote::DidLaunchOrAttach(ArchSpec &process_arch) {
         if (log)
           log->Printf(
               "ProcessGDBRemote::%s analyzing target arch, currently %s %s",
-              __FUNCTION__, target_arch.GetArchitectureName()
-                                ? target_arch.GetArchitectureName()
-                                : "<null>",
+              __FUNCTION__,
+              target_arch.GetArchitectureName()
+                  ? target_arch.GetArchitectureName()
+                  : "<null>",
               target_arch.GetTriple().getTriple().c_str()
                   ? target_arch.GetTriple().getTriple().c_str()
                   : "<null>");
@@ -1115,9 +1119,10 @@ void ProcessGDBRemote::DidLaunchOrAttach(ArchSpec &process_arch) {
           if (log)
             log->Printf("ProcessGDBRemote::%s remote process is ARM/Apple, "
                         "setting target arch to %s %s",
-                        __FUNCTION__, process_arch.GetArchitectureName()
-                                          ? process_arch.GetArchitectureName()
-                                          : "<null>",
+                        __FUNCTION__,
+                        process_arch.GetArchitectureName()
+                            ? process_arch.GetArchitectureName()
+                            : "<null>",
                         process_arch.GetTriple().getTriple().c_str()
                             ? process_arch.GetTriple().getTriple().c_str()
                             : "<null>");
@@ -1145,9 +1150,10 @@ void ProcessGDBRemote::DidLaunchOrAttach(ArchSpec &process_arch) {
         if (log)
           log->Printf("ProcessGDBRemote::%s final target arch after "
                       "adjustments for remote architecture: %s %s",
-                      __FUNCTION__, target_arch.GetArchitectureName()
-                                        ? target_arch.GetArchitectureName()
-                                        : "<null>",
+                      __FUNCTION__,
+                      target_arch.GetArchitectureName()
+                          ? target_arch.GetArchitectureName()
+                          : "<null>",
                       target_arch.GetTriple().getTriple().c_str()
                           ? target_arch.GetTriple().getTriple().c_str()
                           : "<null>");
@@ -3398,6 +3404,26 @@ ProcessGDBRemote::EstablishConnectionIfNeeded(const ProcessInfo &process_info) {
   if (platform_sp && !platform_sp->IsHost())
     return Status("Lost debug server connection");
 
+  // If we're in reproducer mode, try loading the history and hook up the
+  // client with the replay server.
+  StringRef reproducer = GetTarget().GetDebugger().GetReproducer();
+  if (!reproducer.empty()) {
+    FileSpec history_file(reproducer, true);
+    history_file.AppendPathComponent("gdb-remote.yaml");
+    auto error = m_gdb_replay_server.LoadReplayHistory(history_file);
+    if (error)
+      return Status("Unable to load replay history");
+
+    error =
+        GDBRemoteCommunication::ConnectLocally(m_gdb_comm, m_gdb_replay_server);
+    if (error)
+      return Status("Unable to connect to replay server");
+
+    m_gdb_replay_server.StartAsyncThread();
+
+    return ConnectToDebugserver("");
+  }
+
   auto error = LaunchAndConnectToDebugserver(process_info);
   if (error.Fail()) {
     const char *error_string = error.AsCString();
@@ -3507,7 +3533,7 @@ bool ProcessGDBRemote::MonitorDebugserverProcess(
     bool exited,    // True if the process did exit
     int signo,      // Zero for no signal
     int exit_status // Exit value of process if signal is zero
-    ) {
+) {
   // "debugserver_pid" argument passed in is the process ID for debugserver
   // that we are tracking...
   Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_PROCESS));
@@ -4279,8 +4305,9 @@ bool ParseRegisters(XMLNode feature_node, GdbServerTargetInfo &target_info,
     return false;
 
   feature_node.ForEachChildElementWithName(
-      "reg", [&target_info, &dyn_reg_info, &cur_reg_num, &reg_offset,
-              &abi_sp](const XMLNode &reg_node) -> bool {
+      "reg",
+      [&target_info, &dyn_reg_info, &cur_reg_num, &reg_offset,
+       &abi_sp](const XMLNode &reg_node) -> bool {
         std::string gdb_group;
         std::string gdb_type;
         ConstString reg_name;
@@ -4442,7 +4469,7 @@ bool ParseRegisters(XMLNode feature_node, GdbServerTargetInfo &target_info,
   return true;
 }
 
-} // namespace {}
+} // namespace
 
 // query the target of gdb-remote for extended target information return:
 // 'true'  on success
@@ -4516,11 +4543,11 @@ bool ProcessGDBRemote::GetGDBServerRegisterInfo(ArchSpec &arch_to_use) {
 
       // If the target.xml includes an architecture entry like
       //   <architecture>i386:x86-64</architecture> (seen from VMWare ESXi)
-      //   <architecture>arm</architecture> (seen from Segger JLink on unspecified arm board)
+      //   <architecture>arm</architecture> (seen from Segger JLink on
+      //   unspecified arm board)
       // use that if we don't have anything better.
       if (!arch_to_use.IsValid() && !target_info.arch.empty()) {
-        if (target_info.arch == "i386:x86-64")
-        {
+        if (target_info.arch == "i386:x86-64") {
           // We don't have any information about vendor or OS.
           arch_to_use.SetTriple("x86_64--");
           GetTarget().MergeArchitecture(arch_to_use);

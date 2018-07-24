@@ -159,7 +159,8 @@ protected:
   CompressionType m_compression_type;
 
   PacketResult SendPacketNoLock(llvm::StringRef payload);
-  PacketResult SendRawPacketNoLock(llvm::StringRef payload);
+  PacketResult SendRawPacketNoLock(llvm::StringRef payload,
+                                   bool skip_ack = false);
 
   PacketResult ReadPacket(StringExtractorGDBRemote &response,
                           Timeout<std::micro> timeout, bool sync_on_timeout);

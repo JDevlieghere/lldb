@@ -133,7 +133,8 @@ GDBRemoteCommunication::SendPacketNoLock(llvm::StringRef payload) {
 }
 
 GDBRemoteCommunication::PacketResult
-GDBRemoteCommunication::SendRawPacketNoLock(llvm::StringRef packet) {
+GDBRemoteCommunication::SendRawPacketNoLock(llvm::StringRef packet,
+                                            bool skip_ack) {
   if (IsConnected()) {
     Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_PACKETS));
     ConnectionStatus status = eConnectionStatusSuccess;
@@ -182,7 +183,7 @@ GDBRemoteCommunication::SendRawPacketNoLock(llvm::StringRef packet) {
                         bytes_written);
 
     if (bytes_written == packet_length) {
-      if (GetSendAcks())
+      if (!skip_ack && GetSendAcks())
         return GetAck();
       else
         return PacketResult::Success;

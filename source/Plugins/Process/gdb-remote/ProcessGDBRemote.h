@@ -36,6 +36,7 @@
 #include "lldb/lldb-private-forward.h"
 
 #include "GDBRemoteCommunicationClient.h"
+#include "GDBRemoteCommunicationReplayServer.h"
 #include "GDBRemoteRegisterContext.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -264,6 +265,7 @@ protected:
   };
 
   GDBRemoteCommunicationClient m_gdb_comm;
+  GDBRemoteCommunicationReplayServer m_gdb_replay_server;
   std::atomic<lldb::pid_t> m_debugserver_pid;
   std::vector<StringExtractorGDBRemote> m_stop_packet_stack; // The stop packet
                                                              // stack replaces
