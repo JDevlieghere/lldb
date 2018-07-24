@@ -302,6 +302,10 @@ public:
 
   bool SetGenerateReproducer(bool b);
 
+  llvm::StringRef GetReproducer() const;
+
+  void SetReproducer(llvm::StringRef p);
+
   bool GetEscapeNonPrintables() const;
 
   bool GetNotifyVoid() const;

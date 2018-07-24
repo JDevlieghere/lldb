@@ -1050,6 +1050,16 @@ void SBDebugger::SetPrompt(const char *prompt) {
     m_opaque_sp->SetPrompt(llvm::StringRef::withNullAsEmpty(prompt));
 }
 
+const char *SBDebugger::GetReproducer() const {
+  return (m_opaque_sp ? ConstString(m_opaque_sp->GetReproducer()).GetCString()
+                      : nullptr);
+}
+
+void SBDebugger::SetReproducer(const char *prompt) {
+  if (m_opaque_sp)
+    m_opaque_sp->SetReproducer(llvm::StringRef::withNullAsEmpty(prompt));
+}
+
 ScriptLanguage SBDebugger::GetScriptLanguage() const {
   return (m_opaque_sp ? m_opaque_sp->GetScriptLanguage() : eScriptLanguageNone);
 }

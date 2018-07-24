@@ -156,6 +156,9 @@ static OptionDefinition g_options[] = {
      "extensions have been implemented."},
     {LLDB_3_TO_5, false, "debug", 'd', no_argument, 0, eArgTypeNone,
      "Tells the debugger to print out extra information for debugging itself."},
+    {LLDB_3_TO_5, false, "reproducer", 'z', required_argument, 0,
+     eArgTypeFilename,
+     "Tells the debugger to use the fullpath to <path> as a reproducer."},
     {LLDB_OPT_SET_7, true, "repl", 'r', optional_argument, 0, eArgTypeNone,
      "Runs lldb in REPL mode with a stub process."},
     {LLDB_OPT_SET_7, true, "repl-language", 'R', required_argument, 0,
@@ -750,6 +753,16 @@ SBError Driver::ParseArgs(int argc, const char *argv[], FILE *out_fh,
         case 'd':
           m_option_data.m_debug_mode = true;
           break;
+
+        case 'z': {
+          SBFileSpec file(optarg);
+          if (file.Exists()) {
+            m_debugger.SetReproducer(optarg);
+          } else
+            error.SetErrorStringWithFormat("file specified in --reproducer "
+                                           "(-z) option doesn't exist: '%s'",
+                                           optarg);
+        } break;
 
         case 'Q':
           m_option_data.m_source_quietly = true;
