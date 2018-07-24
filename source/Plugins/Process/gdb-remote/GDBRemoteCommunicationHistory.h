@@ -48,6 +48,8 @@ public:
     lldb::tid_t tid;
   };
 
+  static llvm::Expected<std::vector<Entry>> Deserialize(const FileSpec &path);
+
   GDBRemoteCommunicationHistory(uint32_t size = 0);
 
   ~GDBRemoteCommunicationHistory();
@@ -100,7 +102,7 @@ private:
 } // namespace process_gdb_remote
 } // namespace lldb_private
 
-LLVM_YAML_IS_SEQUENCE_VECTOR(
+LLVM_YAML_IS_DOCUMENT_LIST_VECTOR(
     lldb_private::process_gdb_remote::GDBRemoteCommunicationHistory::Entry)
 
 namespace llvm {

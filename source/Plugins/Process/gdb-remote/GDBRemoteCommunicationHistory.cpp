@@ -12,6 +12,7 @@
 // Other libraries and framework includes
 #include "lldb/Core/StreamFile.h"
 #include "lldb/Utility/ConstString.h"
+#include "lldb/Utility/FileSpec.h"
 #include "lldb/Utility/Log.h"
 
 using namespace llvm;
@@ -22,6 +23,26 @@ using namespace lldb_private::process_gdb_remote;
 void GDBRemoteCommunicationHistory::Entry::Serialize(raw_ostream &strm) const {
   yaml::Output yout(strm);
   yout << const_cast<GDBRemoteCommunicationHistory::Entry &>(*this);
+}
+
+llvm::Expected<std::vector<GDBRemoteCommunicationHistory::Entry>>
+Deserialize(const FileSpec &path) {
+  auto error_or_file = MemoryBuffer::getFile(path.GetPath());
+  if (auto err = error_or_file.getError())
+    return errorCodeToError(err);
+
+  std::vector<GDBRemoteCommunicationHistory::Entry> entries;
+  yaml::Input yin((*error_or_file)->getBuffer());
+  yin >> entries;
+
+  if (auto err = yin.error())
+    return errorCodeToError(err);
+
+  // We'll want to manipulate the vector like a stack so we need to reverse the
+  // order of the packets to have the oldest on at the back.
+  std::reverse(entries.begin(), entries.end());
+
+  return entries;
 }
 
 GDBRemoteCommunicationHistory::GDBRemoteCommunicationHistory(uint32_t size)
