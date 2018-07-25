@@ -260,8 +260,8 @@ ProcessGDBRemote::ProcessGDBRemote(lldb::TargetSP target_sp,
       m_addr_to_mmap_size(), m_thread_create_bp_sp(),
       m_waiting_for_attach(false), m_destroy_tried_resuming(false),
       m_command_sp(), m_breakpoint_pc_offset(0),
-      m_initial_tid(LLDB_INVALID_THREAD_ID), m_allow_flash_writes(false),
-      m_erased_flash_ranges() {
+      m_initial_tid(LLDB_INVALID_THREAD_ID), m_replay_mode(false),
+      m_allow_flash_writes(false), m_erased_flash_ranges() {
   m_async_broadcaster.SetEventName(eBroadcastBitAsyncThreadShouldExit,
                                    "async thread should exit");
   m_async_broadcaster.SetEventName(eBroadcastBitAsyncContinue,
@@ -3410,17 +3410,28 @@ ProcessGDBRemote::EstablishConnectionIfNeeded(const ProcessInfo &process_info) {
   if (!reproducer.empty()) {
     FileSpec history_file(reproducer, true);
     history_file.AppendPathComponent("gdb-remote.yaml");
+
+    // Enable replay mode.
+    m_replay_mode = true;
+
+    // Load replay history.
     auto error = m_gdb_replay_server.LoadReplayHistory(history_file);
     if (error)
       return Status("Unable to load replay history");
 
+    // Make a local connection.
     error =
         GDBRemoteCommunication::ConnectLocally(m_gdb_comm, m_gdb_replay_server);
     if (error)
       return Status("Unable to connect to replay server");
 
+    // Start server thread.
     m_gdb_replay_server.StartAsyncThread();
 
+    // Start client thread.
+    StartAsyncThread();
+
+    // Do the usual setup.
     return ConnectToDebugserver("");
   }
 

@@ -37,7 +37,7 @@ GDBRemoteCommunicationReplayServer::GDBRemoteCommunicationReplayServer()
       m_async_broadcaster(nullptr, "lldb.gdb-remote.server.async-broadcaster"),
       m_async_listener_sp(
           Listener::MakeListener("lldb.gdb-remote.server.async-listener")),
-      m_async_thread_state_mutex() {
+      m_async_thread_state_mutex(), m_skip_acks(false) {
   m_async_broadcaster.SetEventName(eBroadcastBitAsyncContinue,
                                    "async thread continue");
   m_async_broadcaster.SetEventName(eBroadcastBitAsyncThreadShouldExit,
@@ -58,23 +58,24 @@ GDBRemoteCommunicationReplayServer::GetPacketAndSendResponse(
     Timeout<std::micro> timeout, Status &error, bool &interrupt, bool &quit) {
   StringExtractorGDBRemote packet;
 
-  printf("Waiting for packet\n");
   PacketResult packet_result = WaitForPacketNoLock(packet, timeout, false);
   if (packet_result == PacketResult::Success) {
 
     m_async_broadcaster.BroadcastEvent(eBroadcastBitAsyncContinue);
-    const StringExtractorGDBRemote::ServerPacketType packet_type =
-        packet.GetServerPacketType();
 
-    printf("Received '%s'\n", packet.GetStringRef().c_str());
-
-    switch (packet_type) {
-    case StringExtractorGDBRemote::eServerPacketType_nack:
-    case StringExtractorGDBRemote::eServerPacketType_ack:
-      // Process the next packet.
-      return PacketResult::Success;
-    default:
-      break;
+    if (m_skip_acks) {
+      const StringExtractorGDBRemote::ServerPacketType packet_type =
+          packet.GetServerPacketType();
+      switch (packet_type) {
+      case StringExtractorGDBRemote::eServerPacketType_nack:
+      case StringExtractorGDBRemote::eServerPacketType_ack:
+        return PacketResult::Success;
+      default:
+        break;
+      }
+    } else if (packet.GetStringRef() == "QStartNoAckMode") {
+      m_skip_acks = true;
+      m_send_acks = false;
     }
 
     while (!m_packet_history.empty()) {
@@ -87,11 +88,8 @@ GDBRemoteCommunicationReplayServer::GetPacketAndSendResponse(
       if (entry.type != GDBRemoteCommunicationHistory::ePacketTypeRecv)
         continue;
 
-      // We always disable acks so it's safe to ignore those.
-      if (entry.packet == "+")
-        continue;
-
-      printf("Sent response '%s'\n", entry.packet.c_str());
+      printf("Replied to '%s' with  '%s'\n", packet.GetStringRef().c_str(),
+             entry.packet.c_str());
       return SendRawPacketNoLock(entry.packet, true);
     }
 
@@ -187,9 +185,7 @@ thread_result_t GDBRemoteCommunicationReplayServer::AsyncThread(void *arg) {
   bool done = false;
 
   while (!done) {
-    printf("Waiting for event\n");
     if (server->m_async_listener_sp->GetEvent(event_sp, llvm::None)) {
-      printf("Received async event\n");
       const uint32_t event_type = event_sp->GetType();
       if (event_sp->BroadcasterIs(&server->m_async_broadcaster)) {
         switch (event_type) {
