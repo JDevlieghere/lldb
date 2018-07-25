@@ -3415,14 +3415,12 @@ ProcessGDBRemote::EstablishConnectionIfNeeded(const ProcessInfo &process_info) {
     m_replay_mode = true;
 
     // Load replay history.
-    auto error = m_gdb_replay_server.LoadReplayHistory(history_file);
-    if (error)
+    if (auto error = m_gdb_replay_server.LoadReplayHistory(history_file))
       return Status("Unable to load replay history");
 
     // Make a local connection.
-    error =
-        GDBRemoteCommunication::ConnectLocally(m_gdb_comm, m_gdb_replay_server);
-    if (error)
+    if (auto error = GDBRemoteCommunication::ConnectLocally(
+            m_gdb_comm, m_gdb_replay_server))
       return Status("Unable to connect to replay server");
 
     // Start server thread.

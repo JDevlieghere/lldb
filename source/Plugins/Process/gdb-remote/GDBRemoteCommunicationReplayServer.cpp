@@ -88,9 +88,9 @@ GDBRemoteCommunicationReplayServer::GetPacketAndSendResponse(
       if (entry.type != GDBRemoteCommunicationHistory::ePacketTypeRecv)
         continue;
 
-      printf("Replied to '%s' with  '%s'\n", packet.GetStringRef().c_str(),
-             entry.packet.c_str());
-      return SendRawPacketNoLock(entry.packet, true);
+      printf("Replied to '%s' with '%s'(%zu)\n", packet.GetStringRef().c_str(),
+             entry.packet.data.c_str(), entry.packet.data.size());
+      return SendRawPacketNoLock(entry.packet.data, true);
     }
 
     quit = true;

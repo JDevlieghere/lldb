@@ -32,16 +32,23 @@ public:
           packet_idx(0), tid(LLDB_INVALID_THREAD_ID) {}
 
     void Clear() {
-      packet.clear();
+      packet.data.clear();
       type = ePacketTypeInvalid;
       bytes_transmitted = 0;
       packet_idx = 0;
       tid = LLDB_INVALID_THREAD_ID;
     }
 
+    struct BinaryData {
+      std::string data;
+      bool NeedsHex() const;
+      void WriteHex(llvm::raw_ostream &os) const;
+      void ReadHex(llvm::StringRef val);
+    };
+
     void Serialize(llvm::raw_ostream &strm) const;
 
-    std::string packet;
+    BinaryData packet;
     PacketType type;
     uint32_t bytes_transmitted;
     uint32_t packet_idx;
@@ -106,28 +113,42 @@ LLVM_YAML_IS_DOCUMENT_LIST_VECTOR(
 namespace llvm {
 namespace yaml {
 
-using namespace lldb_private::process_gdb_remote;
+template <>
+struct ScalarEnumerationTraits<lldb_private::process_gdb_remote::
+                                   GDBRemoteCommunicationHistory::PacketType> {
+  static void enumeration(IO &io,
+                          lldb_private::process_gdb_remote::
+                              GDBRemoteCommunicationHistory::PacketType &value);
+};
 
 template <>
-struct ScalarEnumerationTraits<GDBRemoteCommunicationHistory::PacketType> {
-  static void enumeration(IO &io,
-                          GDBRemoteCommunicationHistory::PacketType &value) {
-    io.enumCase(value, "Invalid",
-                GDBRemoteCommunicationHistory::ePacketTypeInvalid);
-    io.enumCase(value, "Send", GDBRemoteCommunicationHistory::ePacketTypeSend);
-    io.enumCase(value, "Recv", GDBRemoteCommunicationHistory::ePacketTypeRecv);
-  }
+struct ScalarTraits<lldb_private::process_gdb_remote::
+                        GDBRemoteCommunicationHistory::Entry::BinaryData> {
+  static void output(const lldb_private::process_gdb_remote::
+                         GDBRemoteCommunicationHistory::Entry::BinaryData &,
+                     void *, raw_ostream &);
+
+  static StringRef
+  input(StringRef, void *,
+        lldb_private::process_gdb_remote::GDBRemoteCommunicationHistory::Entry::
+            BinaryData &);
+
+  static QuotingType mustQuote(StringRef S) { return QuotingType::None; }
 };
 
-template <> struct MappingTraits<GDBRemoteCommunicationHistory::Entry> {
-  static void mapping(IO &io, GDBRemoteCommunicationHistory::Entry &Entry) {
-    io.mapRequired("packet", Entry.packet);
-    io.mapRequired("type", Entry.type);
-    io.mapRequired("bytes", Entry.bytes_transmitted);
-    io.mapRequired("index", Entry.packet_idx);
-    io.mapRequired("tid", Entry.tid);
-  }
+template <>
+struct MappingTraits<
+    lldb_private::process_gdb_remote::GDBRemoteCommunicationHistory::Entry> {
+  static void
+  mapping(IO &io,
+          lldb_private::process_gdb_remote::GDBRemoteCommunicationHistory::Entry
+              &Entry);
+
+  static StringRef validate(
+      IO &io,
+      lldb_private::process_gdb_remote::GDBRemoteCommunicationHistory::Entry &);
 };
+
 } // namespace yaml
 } // namespace llvm
 

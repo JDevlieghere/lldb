@@ -38,12 +38,12 @@ void GDBRemoteCommunicationHistory::AddPacket(char packet_char, PacketType type,
   const size_t size = m_packets.size();
   if (size > 0) {
     const uint32_t idx = GetNextIndex();
-    m_packets[idx].packet.assign(1, packet_char);
+    m_packets[idx].packet.data.assign(1, packet_char);
     m_packets[idx].type = type;
     m_packets[idx].bytes_transmitted = bytes_transmitted;
     m_packets[idx].packet_idx = m_total_packet_count;
     m_packets[idx].tid = llvm::get_threadid();
-    if (m_stream_up)
+    if (m_stream_up && type == ePacketTypeRecv)
       m_packets[idx].Serialize(*m_stream_up);
   }
 }
@@ -54,12 +54,12 @@ void GDBRemoteCommunicationHistory::AddPacket(const std::string &src,
   const size_t size = m_packets.size();
   if (size > 0) {
     const uint32_t idx = GetNextIndex();
-    m_packets[idx].packet.assign(src, 0, src_len);
+    m_packets[idx].packet.data.assign(src, 0, src_len);
     m_packets[idx].type = type;
     m_packets[idx].bytes_transmitted = bytes_transmitted;
     m_packets[idx].packet_idx = m_total_packet_count;
     m_packets[idx].tid = llvm::get_threadid();
-    if (m_stream_up)
+    if (m_stream_up && type == ePacketTypeRecv)
       m_packets[idx].Serialize(*m_stream_up);
   }
 }
@@ -71,12 +71,12 @@ void GDBRemoteCommunicationHistory::Dump(Stream &strm) const {
   for (uint32_t i = first_idx; i < stop_idx; ++i) {
     const uint32_t idx = NormalizeIndex(i);
     const Entry &entry = m_packets[idx];
-    if (entry.type == ePacketTypeInvalid || entry.packet.empty())
+    if (entry.type == ePacketTypeInvalid || entry.packet.data.empty())
       break;
     strm.Printf("history[%u] tid=0x%4.4" PRIx64 " <%4u> %s packet: %s\n",
                 entry.packet_idx, entry.tid, entry.bytes_transmitted,
                 (entry.type == ePacketTypeSend) ? "send" : "read",
-                entry.packet.c_str());
+                entry.packet.data.c_str());
   }
 }
 
@@ -89,12 +89,75 @@ void GDBRemoteCommunicationHistory::Dump(Log *log) const {
     for (uint32_t i = first_idx; i < stop_idx; ++i) {
       const uint32_t idx = NormalizeIndex(i);
       const Entry &entry = m_packets[idx];
-      if (entry.type == ePacketTypeInvalid || entry.packet.empty())
+      if (entry.type == ePacketTypeInvalid || entry.packet.data.empty())
         break;
       log->Printf("history[%u] tid=0x%4.4" PRIx64 " <%4u> %s packet: %s",
                   entry.packet_idx, entry.tid, entry.bytes_transmitted,
                   (entry.type == ePacketTypeSend) ? "send" : "read",
-                  entry.packet.c_str());
+                  entry.packet.data.c_str());
     }
   }
+}
+
+void GDBRemoteCommunicationHistory::Entry::BinaryData::WriteHex(
+    raw_ostream &os) const {
+  for (uint8_t byte : data)
+    os << hexdigit(byte >> 4) << hexdigit(byte & 0xf);
+}
+
+void GDBRemoteCommunicationHistory::Entry::BinaryData::ReadHex(StringRef val) {
+  data.clear();
+  data.reserve(val.size() / 2);
+  for (unsigned i = 0, n = val.size(); i != n; i += 2) {
+    char byte;
+    val.substr(i, 2).getAsInteger(16, byte);
+    data += byte;
+  }
+}
+
+void yaml::ScalarEnumerationTraits<GDBRemoteCommunicationHistory::PacketType>::
+    enumeration(IO &io, GDBRemoteCommunicationHistory::PacketType &value) {
+  io.enumCase(value, "Invalid",
+              GDBRemoteCommunicationHistory::ePacketTypeInvalid);
+  io.enumCase(value, "Send", GDBRemoteCommunicationHistory::ePacketTypeSend);
+  io.enumCase(value, "Recv", GDBRemoteCommunicationHistory::ePacketTypeRecv);
+}
+
+void yaml::ScalarTraits<GDBRemoteCommunicationHistory::Entry::BinaryData>::
+    output(const GDBRemoteCommunicationHistory::Entry::BinaryData &Val, void *,
+           raw_ostream &Out) {
+  Val.WriteHex(Out);
+}
+
+StringRef
+yaml::ScalarTraits<GDBRemoteCommunicationHistory::Entry::BinaryData>::input(
+    StringRef Scalar, void *,
+    GDBRemoteCommunicationHistory::Entry::BinaryData &Val) {
+  if (Scalar.size() % 2 != 0)
+    return "BinaryData hex string must contain an even number of nybbles.";
+
+  for (unsigned I = 0, N = Scalar.size(); I != N; ++I)
+    if (!isxdigit(Scalar[I]))
+      return "BinaryData hex string must contain only hex digits.";
+
+  Val.ReadHex(Scalar);
+
+  return {};
+}
+
+void yaml::MappingTraits<GDBRemoteCommunicationHistory::Entry>::mapping(
+    IO &io, GDBRemoteCommunicationHistory::Entry &Entry) {
+  io.mapRequired("packet", Entry.packet);
+  io.mapRequired("type", Entry.type);
+  io.mapRequired("bytes", Entry.bytes_transmitted);
+  io.mapRequired("index", Entry.packet_idx);
+  io.mapRequired("tid", Entry.tid);
+}
+
+StringRef yaml::MappingTraits<GDBRemoteCommunicationHistory::Entry>::validate(
+    IO &io, GDBRemoteCommunicationHistory::Entry &Entry) {
+  if (Entry.bytes_transmitted != Entry.packet.data.size())
+    return "BinaryData size doesn't match bytes transmitted";
+
+  return {};
 }
