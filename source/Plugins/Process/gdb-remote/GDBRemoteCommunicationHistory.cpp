@@ -99,22 +99,6 @@ void GDBRemoteCommunicationHistory::Dump(Log *log) const {
   }
 }
 
-void GDBRemoteCommunicationHistory::Entry::BinaryData::WriteHex(
-    raw_ostream &os) const {
-  for (uint8_t byte : data)
-    os << hexdigit(byte >> 4) << hexdigit(byte & 0xf);
-}
-
-void GDBRemoteCommunicationHistory::Entry::BinaryData::ReadHex(StringRef val) {
-  data.clear();
-  data.reserve(val.size() / 2);
-  for (unsigned i = 0, n = val.size(); i != n; i += 2) {
-    char byte;
-    val.substr(i, 2).getAsInteger(16, byte);
-    data += byte;
-  }
-}
-
 void yaml::ScalarEnumerationTraits<GDBRemoteCommunicationHistory::PacketType>::
     enumeration(IO &io, GDBRemoteCommunicationHistory::PacketType &value) {
   io.enumCase(value, "Invalid",
@@ -126,22 +110,14 @@ void yaml::ScalarEnumerationTraits<GDBRemoteCommunicationHistory::PacketType>::
 void yaml::ScalarTraits<GDBRemoteCommunicationHistory::Entry::BinaryData>::
     output(const GDBRemoteCommunicationHistory::Entry::BinaryData &Val, void *,
            raw_ostream &Out) {
-  Val.WriteHex(Out);
+  Out << toHex(Val.data);
 }
 
 StringRef
 yaml::ScalarTraits<GDBRemoteCommunicationHistory::Entry::BinaryData>::input(
     StringRef Scalar, void *,
     GDBRemoteCommunicationHistory::Entry::BinaryData &Val) {
-  if (Scalar.size() % 2 != 0)
-    return "BinaryData hex string must contain an even number of nybbles.";
-
-  for (unsigned I = 0, N = Scalar.size(); I != N; ++I)
-    if (!isxdigit(Scalar[I]))
-      return "BinaryData hex string must contain only hex digits.";
-
-  Val.ReadHex(Scalar);
-
+  Val.data = fromHex(Scalar);
   return {};
 }
 

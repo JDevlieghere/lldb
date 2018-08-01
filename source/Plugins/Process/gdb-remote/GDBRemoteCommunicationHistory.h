@@ -41,9 +41,6 @@ public:
 
     struct BinaryData {
       std::string data;
-      bool NeedsHex() const;
-      void WriteHex(llvm::raw_ostream &os) const;
-      void ReadHex(llvm::StringRef val);
     };
 
     void Serialize(llvm::raw_ostream &strm) const;

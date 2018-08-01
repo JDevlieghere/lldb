@@ -88,8 +88,6 @@ GDBRemoteCommunicationReplayServer::GetPacketAndSendResponse(
       if (entry.type != GDBRemoteCommunicationHistory::ePacketTypeRecv)
         continue;
 
-      printf("Replied to '%s' with '%s'(%zu)\n", packet.GetStringRef().c_str(),
-             entry.packet.data.c_str(), entry.packet.data.size());
       return SendRawPacketNoLock(entry.packet.data, true);
     }
 
@@ -202,8 +200,6 @@ thread_result_t GDBRemoteCommunicationReplayServer::AsyncThread(void *arg) {
       }
     }
   }
-
-  printf("Thread done\n");
 
   return nullptr;
 }
