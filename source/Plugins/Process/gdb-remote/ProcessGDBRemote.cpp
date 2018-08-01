@@ -68,6 +68,7 @@
 #include "lldb/Utility/Args.h"
 #include "lldb/Utility/CleanUp.h"
 #include "lldb/Utility/FileSpec.h"
+#include "lldb/Utility/Reproducer.h"
 #include "lldb/Utility/StreamString.h"
 #include "lldb/Utility/Timer.h"
 
@@ -158,6 +159,20 @@ static const ProcessKDPPropertiesSP &GetGlobalPluginProperties() {
     g_settings_sp.reset(new PluginProperties());
   return g_settings_sp;
 }
+
+class ProcessGDBRemoteProvider : public Reproducer::Provider {
+public:
+  ProcessGDBRemoteProvider(FileSpec directory) : Provider(directory) {
+    m_info.name = "gdb-remote";
+    m_info.files.push_back("gdb-remote.yaml");
+  }
+
+  FileSpec GetHistoryFile() {
+    FileSpec history_file = GetDirectory();
+    history_file.AppendPathComponent("gdb-remote.yaml");
+    return history_file;
+  }
+};
 
 } // namespace
 
@@ -271,10 +286,13 @@ ProcessGDBRemote::ProcessGDBRemote(lldb::TargetSP target_sp,
 
   if (GetTarget().GetDebugger().GetGenerateReproducer() &&
       GetTarget().GetDebugger().GetReproducer().empty()) {
-    // FIXME: Don't hard code path.
+
+    ProcessGDBRemoteProvider &provider =
+        Reproducer::Instance()->CreateProvider<ProcessGDBRemoteProvider>();
+
     std::error_code EC;
-    auto file_out = make_unique<raw_fd_ostream>("/tmp/gdb-remote.yaml", EC,
-                                                sys::fs::OpenFlags::F_None);
+    auto file_out = make_unique<raw_fd_ostream>(
+        provider.GetHistoryFile().GetPath(), EC, sys::fs::OpenFlags::F_None);
     if (!EC)
       m_gdb_comm.SetHistoryStream(std::move(file_out));
   }

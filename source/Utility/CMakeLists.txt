@@ -61,6 +61,7 @@ add_lldb_library(lldbUtility
   NameMatches.cpp
   Range.cpp
   RegularExpression.cpp
+  Reproducer.cpp
   SelectHelper.cpp
   SharingPtr.cpp
   Status.cpp
