@@ -761,7 +761,7 @@ SBError Driver::ParseArgs(int argc, const char *argv[], FILE *out_fh,
         case 'z': {
           SBFileSpec file(optarg);
           if (file.Exists()) {
-            m_debugger.SetReproducer(optarg);
+            m_debugger.SetReproducerPath(optarg);
           } else
             error.SetErrorStringWithFormat("file specified in --reproducer "
                                            "(-z) option doesn't exist: '%s'",

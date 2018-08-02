@@ -226,9 +226,9 @@ public:
 
   void SetPrompt(const char *prompt);
 
-  const char *GetReproducer() const;
+  const char *GetReproducerPath() const;
 
-  void SetReproducer(const char *reproducer);
+  void SetReproducerPath(const char *reproducer);
 
   lldb::ScriptLanguage GetScriptLanguage() const;
 

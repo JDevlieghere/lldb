@@ -177,7 +177,7 @@ public:
 
   void Keep() {
     Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_PROCESS));
-    log->Printf("ProcessGDBRemoteProvider::%s wrote reproducer to %s",
+    log->Printf("ProcessGDBRemoteProvider::%s() wrote reproducer to %s",
                 __FUNCTION__, GetHistoryFile().GetPath().c_str());
   }
 };
@@ -292,14 +292,9 @@ ProcessGDBRemote::ProcessGDBRemote(lldb::TargetSP target_sp,
   m_async_broadcaster.SetEventName(eBroadcastBitAsyncThreadDidExit,
                                    "async thread did exit");
 
-  if (GetTarget().GetDebugger().GetGenerateReproducer() &&
-      GetTarget().GetDebugger().GetReproducer().empty()) {
-
-    Reproducer::Generator *generator = Reproducer::GetGenerator();
-
-    // FIXME: This should be done somewhere centralized.
-    generator->SetEnabled(true);
-
+  Reproducer::Generator *generator =
+      GetTarget().GetDebugger().GetReproducer().GetGenerator();
+  if (generator) {
     ProcessGDBRemoteProvider &provider =
         generator->CreateProvider<ProcessGDBRemoteProvider>();
 
@@ -3437,18 +3432,13 @@ ProcessGDBRemote::EstablishConnectionIfNeeded(const ProcessInfo &process_info) {
 
   // If we're in reproducer mode, try loading the history and hook up the
   // client with the replay server.
-  StringRef reproducer = GetTarget().GetDebugger().GetReproducer();
-  if (!reproducer.empty()) {
-    Reproducer::Loader *loader = Reproducer::GetLoader();
-
-    // FIXME: This should be done somewhere centralized.
-    auto error = loader->LoadIndex(FileSpec(reproducer, true));
-    if (error)
-      llvm::consumeError(std::move(error));
-
+  Reproducer::Loader *loader =
+      GetTarget().GetDebugger().GetReproducer().GetLoader();
+  if (loader) {
     auto provider_info = loader->GetProviderInfo("gdb-remote");
     if (provider_info && !provider_info->files.empty()) {
-      FileSpec history_file(reproducer, true);
+      // Construct replay history path.
+      FileSpec history_file = loader->GetDirectory();
       history_file.AppendPathComponent(provider_info->files.front());
 
       // Enable replay mode.

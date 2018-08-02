@@ -319,7 +319,7 @@ enum {
   ePropertyEscapeNonPrintables,
   ePropertyFrameFormatUnique,
   ePropertyGenerateReproducer,
-  ePropertyReproducer,
+  ePropertyReproducerPath,
 };
 
 LoadPluginCallbackType Debugger::g_load_plugin_callback = nullptr;
@@ -355,6 +355,11 @@ Status Debugger::SetPropertyValue(const ExecutionContext *exe_ctx,
       // use-color changed. Ping the prompt so it can reset the ansi terminal
       // codes.
       SetPrompt(GetPrompt());
+    } else if (property_path ==
+               g_properties[ePropertyGenerateReproducer].name) {
+      SetGenerateReproducer(GetGenerateReproducer());
+    } else if (property_path == g_properties[ePropertyReproducerPath].name) {
+      SetReproducerPath(GetReproducerPath());
     } else if (is_load_script && target_sp &&
                load_script_old_value == eLoadScriptFromSymFileWarn) {
       if (target_sp->TargetProperties::GetLoadScriptFromSymbolFile() ==
@@ -570,18 +575,23 @@ bool Debugger::GetGenerateReproducer() const {
 
 bool Debugger::SetGenerateReproducer(bool b) {
   const uint32_t idx = ePropertyGenerateReproducer;
+  m_reproducer.SetGenerateReproducer(b);
   return m_collection_sp->SetPropertyAtIndexAsBoolean(nullptr, idx, b);
 }
 
-llvm::StringRef Debugger::GetReproducer() const {
-  const uint32_t idx = ePropertyReproducer;
+llvm::StringRef Debugger::GetReproducerPath() const {
+  const uint32_t idx = ePropertyReproducerPath;
   return m_collection_sp->GetPropertyAtIndexAsString(
       nullptr, idx, g_properties[idx].default_cstr_value);
 }
 
-void Debugger::SetReproducer(llvm::StringRef p) {
-  const uint32_t idx = ePropertyReproducer;
+void Debugger::SetReproducerPath(llvm::StringRef p) {
+  const uint32_t idx = ePropertyReproducerPath;
   m_collection_sp->SetPropertyAtIndexAsString(nullptr, idx, p);
+
+  m_reproducer.SetUseReproducer(!p.empty());
+  if (auto e = m_reproducer.GetLoader()->LoadIndex(FileSpec(p, true)))
+    llvm::consumeError(std::move(e));
 }
 
 #pragma mark Debugger

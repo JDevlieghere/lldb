@@ -31,6 +31,7 @@
 #include "lldb/Target/TargetList.h"
 #include "lldb/Utility/ConstString.h" // for ConstString
 #include "lldb/Utility/FileSpec.h"    // for FileSpec
+#include "lldb/Utility/Reproducer.h"
 #include "lldb/Utility/Status.h"      // for Status
 #include "lldb/Utility/UserID.h"
 #include "lldb/lldb-defines.h"              // for DISALLOW_COPY_AND_ASSIGN
@@ -225,6 +226,8 @@ public:
 
   void SetLoggingCallback(lldb::LogOutputCallback log_callback, void *baton);
 
+  Reproducer &GetReproducer() { return m_reproducer; }
+
   //----------------------------------------------------------------------
   // Properties Functions
   //----------------------------------------------------------------------
@@ -304,9 +307,9 @@ public:
 
   bool SetGenerateReproducer(bool b);
 
-  llvm::StringRef GetReproducer() const;
+  llvm::StringRef GetReproducerPath() const;
 
-  void SetReproducer(llvm::StringRef p);
+  void SetReproducerPath(llvm::StringRef p);
 
   bool GetEscapeNonPrintables() const;
 
@@ -414,6 +417,7 @@ protected:
   Broadcaster m_sync_broadcaster;
   lldb::ListenerSP m_forward_listener_sp;
   llvm::once_flag m_clear_once;
+  Reproducer m_reproducer;
 
   //----------------------------------------------------------------------
   // Events for m_sync_broadcaster

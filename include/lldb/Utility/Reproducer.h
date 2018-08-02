@@ -73,8 +73,7 @@ public:
   class Generator final {
   public:
     Generator();
-
-    void SetEnabled(bool enabled) { m_enabled = enabled; }
+    ~Generator();
 
     /// Method to indicate we want to keep the reproducer. If reproducer
     /// generation is disabled, this does nothing.
@@ -92,6 +91,9 @@ public:
     }
 
   private:
+    friend Reproducer;
+
+    void SetEnabled(bool enabled) { m_enabled = enabled; }
     Provider &Register(std::unique_ptr<Provider> &&provider);
     void AddProviderToIndex(const ProviderInfo &provider_info);
 
@@ -116,20 +118,26 @@ public:
     llvm::Optional<ProviderInfo> GetProviderInfo(llvm::StringRef name);
     llvm::Error LoadIndex(const FileSpec &directory);
 
+    const FileSpec &GetDirectory() { return m_directory; }
+
   private:
     llvm::StringMap<ProviderInfo> m_provider_info;
+    FileSpec m_directory;
     bool m_loaded;
   };
 
-  static Generator *GetGenerator();
-  static Loader *GetLoader();
+  Generator *GetGenerator();
+  Loader *GetLoader();
+
+  void SetGenerateReproducer(bool value);
+  void SetUseReproducer(bool value);
 
 private:
-  static std::atomic<Generator *> g_generator;
-  static std::mutex g_generator_mutex;
+  Generator m_generator;
+  Loader m_loader;
 
-  static std::atomic<Loader *> g_loader;
-  static std::mutex g_loader_mutex;
+  bool m_generate_reproducer = false;
+  bool m_use_reproducer = false;
 };
 
 } // namespace lldb_private

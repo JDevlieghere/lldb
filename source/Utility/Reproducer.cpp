@@ -17,34 +17,42 @@ using namespace lldb_private;
 using namespace llvm;
 using namespace llvm::yaml;
 
-std::atomic<Reproducer::Generator *> Reproducer::g_generator;
-std::mutex Reproducer::g_generator_mutex;
-
-std::atomic<Reproducer::Loader *> Reproducer::g_loader;
-std::mutex Reproducer::g_loader_mutex;
-
 Reproducer::Generator *Reproducer::GetGenerator() {
-  if (g_generator == nullptr) {
-    std::lock_guard<std::mutex> lock(g_generator_mutex);
-    if (g_generator == nullptr) {
-      g_generator = new Reproducer::Generator();
-    }
-  }
-  return g_generator;
+  if (m_generate_reproducer)
+    return &m_generator;
+  return nullptr;
 }
 
 Reproducer::Loader *Reproducer::GetLoader() {
-  if (g_loader == nullptr) {
-    std::lock_guard<std::mutex> lock(g_loader_mutex);
-    if (g_loader == nullptr) {
-      g_loader = new Reproducer::Loader();
-    }
-  }
-  return g_loader;
+  if (m_use_reproducer)
+    return &m_loader;
+  return nullptr;
+}
+
+void Reproducer::SetGenerateReproducer(bool value) {
+  assert(!value ||
+         !m_use_reproducer && "Cannot generate reproducer when using one.");
+  m_generate_reproducer = value;
+  m_generator.SetEnabled(value);
+}
+
+void Reproducer::SetUseReproducer(bool value) {
+  assert(!value || !m_generate_reproducer &&
+                       "Cannot use reproducer when generating one.");
+  m_use_reproducer = value;
 }
 
 Reproducer::Generator::Generator() : m_enabled(false), m_done(false) {
   m_directory = HostInfo::GetReproducerTempDir();
+}
+
+Reproducer::Generator::~Generator() {
+  if (m_done)
+    return;
+  if (m_enabled)
+    Keep();
+  else
+    Discard();
 }
 
 Reproducer::Provider &Reproducer::Generator::Register(
@@ -116,6 +124,7 @@ llvm::Error Reproducer::Loader::LoadIndex(const FileSpec &directory) {
   for (auto &info : provider_info)
     m_provider_info[info.name] = info;
 
+  m_directory = directory;
   m_loaded = true;
 
   return llvm::Error::success();
