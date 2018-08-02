@@ -288,7 +288,7 @@ static PropertyDefinition g_properties[] = {
     {"generate-reproducer", OptionValue::eTypeBoolean, false, false, nullptr,
      nullptr,
      "If true, LLDB will generate files to reproduce the current session."},
-    {"reproducer", OptionValue::eTypeString, false, 0, nullptr, nullptr,
+    {"reproducer-path", OptionValue::eTypeFileSpec, false, 0, nullptr, nullptr,
      "If set, LLDB will replay the session from the provided reproducer."},
     {nullptr, OptionValue::eTypeInvalid, true, 0, nullptr, nullptr, nullptr}};
 
@@ -579,19 +579,19 @@ bool Debugger::SetGenerateReproducer(bool b) {
   return m_collection_sp->SetPropertyAtIndexAsBoolean(nullptr, idx, b);
 }
 
-llvm::StringRef Debugger::GetReproducerPath() const {
+FileSpec Debugger::GetReproducerPath() const {
   const uint32_t idx = ePropertyReproducerPath;
-  return m_collection_sp->GetPropertyAtIndexAsString(
-      nullptr, idx, g_properties[idx].default_cstr_value);
+  return m_collection_sp->GetPropertyAtIndexAsFileSpec(nullptr, idx);
 }
 
-void Debugger::SetReproducerPath(llvm::StringRef p) {
+void Debugger::SetReproducerPath(const FileSpec &p) {
   const uint32_t idx = ePropertyReproducerPath;
-  m_collection_sp->SetPropertyAtIndexAsString(nullptr, idx, p);
+  m_collection_sp->SetPropertyAtIndexAsFileSpec(nullptr, idx, p);
 
-  m_reproducer.SetUseReproducer(!p.empty());
-  if (auto e = m_reproducer.GetLoader()->LoadIndex(FileSpec(p, true)))
-    llvm::consumeError(std::move(e));
+  m_reproducer.SetUseReproducer(p.operator bool());
+  if (auto loader = m_reproducer.GetLoader())
+    if (auto e = loader->LoadIndex(p))
+      llvm::consumeError(std::move(e));
 }
 
 #pragma mark Debugger

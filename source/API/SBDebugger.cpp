@@ -1051,14 +1051,15 @@ void SBDebugger::SetPrompt(const char *prompt) {
 }
 
 const char *SBDebugger::GetReproducerPath() const {
-  return (m_opaque_sp
-              ? ConstString(m_opaque_sp->GetReproducerPath()).GetCString()
-              : nullptr);
+  return (
+      m_opaque_sp
+          ? ConstString(m_opaque_sp->GetReproducerPath().GetPath()).GetCString()
+          : nullptr);
 }
 
-void SBDebugger::SetReproducerPath(const char *prompt) {
+void SBDebugger::SetReproducerPath(const char *p) {
   if (m_opaque_sp)
-    m_opaque_sp->SetReproducerPath(llvm::StringRef::withNullAsEmpty(prompt));
+    m_opaque_sp->SetReproducerPath(FileSpec(p, true));
 }
 
 ScriptLanguage SBDebugger::GetScriptLanguage() const {

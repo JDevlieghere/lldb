@@ -307,9 +307,9 @@ public:
 
   bool SetGenerateReproducer(bool b);
 
-  llvm::StringRef GetReproducerPath() const;
+  FileSpec GetReproducerPath() const;
 
-  void SetReproducerPath(llvm::StringRef p);
+  void SetReproducerPath(const FileSpec &p);
 
   bool GetEscapeNonPrintables() const;
 
