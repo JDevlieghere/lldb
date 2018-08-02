@@ -74,6 +74,8 @@ void Reproducer::Generator::Keep() {
 
   for (auto &provider : m_providers)
     provider->Keep();
+
+  errs() << "Reproducer written to '" << m_directory.GetPath() << "'\n";
 }
 
 void Reproducer::Generator::Discard() {
