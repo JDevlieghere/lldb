@@ -10,33 +10,45 @@
 #include "lldb/Utility/Reproducer.h"
 #include "lldb/Host/HostInfo.h"
 
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace lldb_private;
 using namespace llvm;
 using namespace llvm::yaml;
 
-std::atomic<Reproducer *> Reproducer::g_instance;
-std::mutex Reproducer::g_instance_mutex;
+std::atomic<Reproducer::Generator *> Reproducer::g_generator;
+std::mutex Reproducer::g_generator_mutex;
 
-Reproducer::Reproducer() : m_enabled(false), m_done(false) {
+std::atomic<Reproducer::Loader *> Reproducer::g_loader;
+std::mutex Reproducer::g_loader_mutex;
+
+Reproducer::Generator *Reproducer::GetGenerator() {
+  if (g_generator == nullptr) {
+    std::lock_guard<std::mutex> lock(g_generator_mutex);
+    if (g_generator == nullptr) {
+      g_generator = new Reproducer::Generator();
+    }
+  }
+  return g_generator;
+}
+
+Reproducer::Loader *Reproducer::GetLoader() {
+  if (g_loader == nullptr) {
+    std::lock_guard<std::mutex> lock(g_loader_mutex);
+    if (g_loader == nullptr) {
+      g_loader = new Reproducer::Loader();
+    }
+  }
+  return g_loader;
+}
+
+Reproducer::Generator::Generator() : m_enabled(false), m_done(false) {
   m_directory = HostInfo::GetReproducerTempDir();
 }
 
-Reproducer::~Reproducer() { assert(m_done); }
-
-Reproducer *Reproducer::Instance() {
-  if (g_instance == nullptr) {
-    std::lock_guard<std::mutex> lock(g_instance_mutex);
-    if (g_instance == nullptr) {
-      g_instance = new Reproducer();
-    }
-  }
-  return g_instance;
-}
-
-Reproducer::Provider &
-Reproducer::Register(std::unique_ptr<Reproducer::Provider> &&provider) {
+Reproducer::Provider &Reproducer::Generator::Register(
+    std::unique_ptr<Reproducer::Provider> &&provider) {
   std::lock_guard<std::mutex> lock(m_providers_mutex);
 
   AddProviderToIndex(provider->GetInfo());
@@ -45,7 +57,7 @@ Reproducer::Register(std::unique_ptr<Reproducer::Provider> &&provider) {
   return *m_providers.back();
 }
 
-void Reproducer::Keep() {
+void Reproducer::Generator::Keep() {
   assert(!m_done);
   m_done = true;
 
@@ -56,7 +68,7 @@ void Reproducer::Keep() {
     provider->Keep();
 }
 
-void Reproducer::Discard() {
+void Reproducer::Generator::Discard() {
   assert(!m_done);
   m_done = true;
 
@@ -65,9 +77,11 @@ void Reproducer::Discard() {
 
   for (auto &provider : m_providers)
     provider->Discard();
+
+  llvm::sys::fs::remove_directories(m_directory.GetPath());
 }
 
-void Reproducer::AddProviderToIndex(
+void Reproducer::Generator::AddProviderToIndex(
     const Reproducer::ProviderInfo &provider_info) {
   FileSpec index = m_directory;
   index.AppendPathComponent("index.yaml");
@@ -77,4 +91,43 @@ void Reproducer::AddProviderToIndex(
                                           sys::fs::OpenFlags::F_None);
   yaml::Output yout(*strm);
   yout << const_cast<Reproducer::ProviderInfo &>(provider_info);
+}
+
+Reproducer::Loader::Loader() : m_loaded(false) {}
+
+llvm::Error Reproducer::Loader::LoadIndex(const FileSpec &directory) {
+  if (m_loaded)
+    return llvm::Error::success();
+
+  FileSpec index = directory;
+  index.AppendPathComponent("index.yaml");
+
+  auto error_or_file = MemoryBuffer::getFile(index.GetPath());
+  if (auto err = error_or_file.getError())
+    return errorCodeToError(err);
+
+  std::vector<Reproducer::ProviderInfo> provider_info;
+  yaml::Input yin((*error_or_file)->getBuffer());
+  yin >> provider_info;
+
+  if (auto err = yin.error())
+    return errorCodeToError(err);
+
+  for (auto &info : provider_info)
+    m_provider_info[info.name] = info;
+
+  m_loaded = true;
+
+  return llvm::Error::success();
+}
+
+llvm::Optional<Reproducer::ProviderInfo>
+Reproducer::Loader::GetProviderInfo(StringRef name) {
+  assert(m_loaded);
+
+  auto it = m_provider_info.find(name);
+  if (it == m_provider_info.end())
+    return llvm::None;
+
+  return it->second;
 }

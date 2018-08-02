@@ -1,3 +1,5 @@
+
+
 //===-- ProcessGDBRemote.cpp ------------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -172,6 +174,12 @@ public:
     history_file.AppendPathComponent("gdb-remote.yaml");
     return history_file;
   }
+
+  void Keep() {
+    Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_PROCESS));
+    log->Printf("ProcessGDBRemoteProvider::%s wrote reproducer to %s",
+                __FUNCTION__, GetHistoryFile().GetPath().c_str());
+  }
 };
 
 } // namespace
@@ -287,8 +295,13 @@ ProcessGDBRemote::ProcessGDBRemote(lldb::TargetSP target_sp,
   if (GetTarget().GetDebugger().GetGenerateReproducer() &&
       GetTarget().GetDebugger().GetReproducer().empty()) {
 
+    Reproducer::Generator *generator = Reproducer::GetGenerator();
+
+    // FIXME: This should be done somewhere centralized.
+    generator->SetEnabled(true);
+
     ProcessGDBRemoteProvider &provider =
-        Reproducer::Instance()->CreateProvider<ProcessGDBRemoteProvider>();
+        generator->CreateProvider<ProcessGDBRemoteProvider>();
 
     std::error_code EC;
     auto file_out = make_unique<raw_fd_ostream>(
@@ -3426,29 +3439,39 @@ ProcessGDBRemote::EstablishConnectionIfNeeded(const ProcessInfo &process_info) {
   // client with the replay server.
   StringRef reproducer = GetTarget().GetDebugger().GetReproducer();
   if (!reproducer.empty()) {
-    FileSpec history_file(reproducer, true);
-    history_file.AppendPathComponent("gdb-remote.yaml");
+    Reproducer::Loader *loader = Reproducer::GetLoader();
 
-    // Enable replay mode.
-    m_replay_mode = true;
+    // FIXME: This should be done somewhere centralized.
+    auto error = loader->LoadIndex(FileSpec(reproducer, true));
+    if (error)
+      llvm::consumeError(std::move(error));
 
-    // Load replay history.
-    if (auto error = m_gdb_replay_server.LoadReplayHistory(history_file))
-      return Status("Unable to load replay history");
+    auto provider_info = loader->GetProviderInfo("gdb-remote");
+    if (provider_info && !provider_info->files.empty()) {
+      FileSpec history_file(reproducer, true);
+      history_file.AppendPathComponent(provider_info->files.front());
 
-    // Make a local connection.
-    if (auto error = GDBRemoteCommunication::ConnectLocally(
-            m_gdb_comm, m_gdb_replay_server))
-      return Status("Unable to connect to replay server");
+      // Enable replay mode.
+      m_replay_mode = true;
 
-    // Start server thread.
-    m_gdb_replay_server.StartAsyncThread();
+      // Load replay history.
+      if (auto error = m_gdb_replay_server.LoadReplayHistory(history_file))
+        return Status("Unable to load replay history");
 
-    // Start client thread.
-    StartAsyncThread();
+      // Make a local connection.
+      if (auto error = GDBRemoteCommunication::ConnectLocally(
+              m_gdb_comm, m_gdb_replay_server))
+        return Status("Unable to connect to replay server");
 
-    // Do the usual setup.
-    return ConnectToDebugserver("");
+      // Start server thread.
+      m_gdb_replay_server.StartAsyncThread();
+
+      // Start client thread.
+      StartAsyncThread();
+
+      // Do the usual setup.
+      return ConnectToDebugserver("");
+    }
   }
 
   auto error = LaunchAndConnectToDebugserver(process_info);

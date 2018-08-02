@@ -11,6 +11,9 @@
 #define LLDB_UTILITY_REPRODUCER_H
 
 #include "lldb/Utility/FileSpec.h"
+
+#include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/YAMLTraits.h"
 
 #include <mutex>
@@ -19,33 +22,43 @@
 
 namespace lldb_private {
 
+/// The reproducer class contains several nested classes for generating and
+/// loading reproducers. Clients can obtain access to the Generator and Loader
+/// through this class.
 class Reproducer final {
+
 public:
-  Reproducer();
-  ~Reproducer();
-
-  static Reproducer *Instance();
-
+  /// Abstraction for information associated with a provider. This information
+  /// is serialized into an index which is used by the loader.
   struct ProviderInfo {
     std::string name;
     std::vector<std::string> files;
   };
 
-  /// A provider is responsible for generating the files necessary for
-  /// reproduction. The implementation is free to decide how to do this as long
-  /// as it communicates its files via the Provider info.
+  /// The provider defines an interface for generating files needed for
+  /// reproducing. The provider must populate its ProviderInfo to communicate
+  /// its name and files to the index, before registering with the generator,
+  /// i.e. in the constructor.
+  ///
+  /// Different components will implement different providers.
   class Provider {
   public:
-    Provider(FileSpec directory) : m_directory(directory) {}
     virtual ~Provider() = default;
 
     ProviderInfo GetInfo() { return m_info; }
     const FileSpec &GetDirectory() { return m_directory; }
 
+    /// The Keep method is called when it is decided that we need to keep the
+    /// data in order to provide a reproducer.
     virtual void Keep(){};
+
+    /// The Discard method is called when it is decided that we do not need to
+    /// keep any information and will not generate a reproducer.
     virtual void Discard(){};
 
   protected:
+    Provider(FileSpec directory) : m_directory(directory) {}
+
     /// Every provider keeps track of its own files.
     ProviderInfo m_info;
 
@@ -54,31 +67,69 @@ public:
     FileSpec m_directory;
   };
 
-  void SetEnabled(bool enabled);
+  /// The generator is responsible for the logic needed to generate a
+  /// reproducer. For doing so it relies on providers, who serialize data that
+  /// is necessary for reproducing  a failure.
+  class Generator final {
+  public:
+    Generator();
 
-  void Keep();
-  void Discard();
+    void SetEnabled(bool enabled) { m_enabled = enabled; }
 
-  Provider &Register(std::unique_ptr<Provider> &&provider);
+    /// Method to indicate we want to keep the reproducer. If reproducer
+    /// generation is disabled, this does nothing.
+    void Keep();
 
-  /// Convenience helper to create and register a new provider.
-  template <typename T> T &CreateProvider() {
-    std::unique_ptr<T> provider = llvm::make_unique<T>(m_directory);
-    return static_cast<T &>(Register(std::move(provider)));
-  }
+    /// Method to indicate we do not want to keep the reproducer. This is
+    /// unaffected by whether or not generation reproduction is enabled, as we
+    /// might need to clean up files already written to disk.
+    void Discard();
+
+    /// Providers are registered at creating time.
+    template <typename T> T &CreateProvider() {
+      std::unique_ptr<T> provider = llvm::make_unique<T>(m_directory);
+      return static_cast<T &>(Register(std::move(provider)));
+    }
+
+  private:
+    Provider &Register(std::unique_ptr<Provider> &&provider);
+    void AddProviderToIndex(const ProviderInfo &provider_info);
+
+    std::vector<std::unique_ptr<Provider>> m_providers;
+    std::mutex m_providers_mutex;
+
+    /// The reproducer root directory.
+    FileSpec m_directory;
+
+    /// Flag for controlling whether we generate a reproducer when Keep is
+    /// called.
+    bool m_enabled;
+
+    /// Flag to ensure that we never call both keep and discard.
+    bool m_done;
+  };
+
+  class Loader final {
+  public:
+    Loader();
+
+    llvm::Optional<ProviderInfo> GetProviderInfo(llvm::StringRef name);
+    llvm::Error LoadIndex(const FileSpec &directory);
+
+  private:
+    llvm::StringMap<ProviderInfo> m_provider_info;
+    bool m_loaded;
+  };
+
+  static Generator *GetGenerator();
+  static Loader *GetLoader();
 
 private:
-  void AddProviderToIndex(const ProviderInfo &provider_info);
+  static std::atomic<Generator *> g_generator;
+  static std::mutex g_generator_mutex;
 
-  std::mutex m_providers_mutex;
-  std::vector<std::unique_ptr<Provider>> m_providers;
-
-  FileSpec m_directory;
-  bool m_enabled;
-  bool m_done;
-
-  static std::atomic<Reproducer *> g_instance;
-  static std::mutex g_instance_mutex;
+  static std::atomic<Loader *> g_loader;
+  static std::mutex g_loader_mutex;
 };
 
 } // namespace lldb_private

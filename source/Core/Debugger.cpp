@@ -285,7 +285,7 @@ static PropertyDefinition g_properties[] = {
      DEFAULT_FRAME_FORMAT_NO_ARGS, nullptr,
      "The default frame format string to use when displaying stack frame"
      "information for threads from thread backtrace unique."},
-    {"generate-reproducer", OptionValue::eTypeBoolean, true, true, nullptr,
+    {"generate-reproducer", OptionValue::eTypeBoolean, false, false, nullptr,
      nullptr,
      "If true, LLDB will generate files to reproduce the current session."},
     {"reproducer", OptionValue::eTypeString, false, 0, nullptr, nullptr,
