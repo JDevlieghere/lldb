@@ -174,12 +174,6 @@ public:
     history_file.AppendPathComponent("gdb-remote.yaml");
     return history_file;
   }
-
-  void Keep() {
-    Log *log(ProcessGDBRemoteLog::GetLogIfAllCategoriesSet(GDBR_LOG_PROCESS));
-    log->Printf("ProcessGDBRemoteProvider::%s() wrote reproducer to %s",
-                __FUNCTION__, GetHistoryFile().GetPath().c_str());
-  }
 };
 
 } // namespace

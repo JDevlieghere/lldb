@@ -588,10 +588,16 @@ void Debugger::SetReproducerPath(const FileSpec &p) {
   const uint32_t idx = ePropertyReproducerPath;
   m_collection_sp->SetPropertyAtIndexAsFileSpec(nullptr, idx, p);
 
-  m_reproducer.SetUseReproducer(p.operator bool());
-  if (auto loader = m_reproducer.GetLoader())
-    if (auto e = loader->LoadIndex(p))
-      llvm::consumeError(std::move(e));
+  if(!GetGenerateReproducer()) {
+    m_reproducer.SetUseReproducer(p.operator bool());
+    if (auto loader = m_reproducer.GetLoader())
+      if (auto e = loader->LoadIndex(p))
+        llvm::consumeError(std::move(e));
+  } else if (auto generator = m_reproducer.GetGenerator()){
+    // When generate reproducer is enabled before setting the reproducer path,
+    // we use that as the root.
+    generator->ChangeDirectory(p);
+  }
 }
 
 #pragma mark Debugger

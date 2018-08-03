@@ -91,6 +91,12 @@ void Reproducer::Generator::Discard() {
   llvm::sys::fs::remove_directories(m_directory.GetPath());
 }
 
+void Reproducer::Generator::ChangeDirectory(const FileSpec &directory) {
+  assert(m_providers.empty() && "Changing the directory after providers have "
+                                "been registered would invalidate the index.");
+  m_directory = directory;
+}
+
 void Reproducer::Generator::AddProviderToIndex(
     const Reproducer::ProviderInfo &provider_info) {
   FileSpec index = m_directory;

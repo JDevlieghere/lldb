@@ -90,6 +90,8 @@ public:
       return static_cast<T &>(Register(std::move(provider)));
     }
 
+    void ChangeDirectory(const FileSpec& directory);
+
   private:
     friend Reproducer;
 
