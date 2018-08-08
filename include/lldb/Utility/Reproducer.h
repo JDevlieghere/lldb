@@ -45,7 +45,7 @@ public:
   public:
     virtual ~Provider() = default;
 
-    ProviderInfo GetInfo() { return m_info; }
+    const ProviderInfo& GetInfo() { return m_info; }
     const FileSpec &GetDirectory() { return m_directory; }
 
     /// The Keep method is called when it is decided that we need to keep the
@@ -96,7 +96,7 @@ public:
     friend Reproducer;
 
     void SetEnabled(bool enabled) { m_enabled = enabled; }
-    Provider &Register(std::unique_ptr<Provider> &&provider);
+    Provider &Register(std::unique_ptr<Provider> provider);
     void AddProviderToIndex(const ProviderInfo &provider_info);
 
     std::vector<std::unique_ptr<Provider>> m_providers;

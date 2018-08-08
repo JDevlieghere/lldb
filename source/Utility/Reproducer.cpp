@@ -30,15 +30,15 @@ Reproducer::Loader *Reproducer::GetLoader() {
 }
 
 void Reproducer::SetGenerateReproducer(bool value) {
-  assert(!value ||
-         !m_use_reproducer && "Cannot generate reproducer when using one.");
+  assert((!value || !m_use_reproducer) &&
+         "Cannot generate reproducer when using one.");
   m_generate_reproducer = value;
   m_generator.SetEnabled(value);
 }
 
 void Reproducer::SetUseReproducer(bool value) {
-  assert(!value || !m_generate_reproducer &&
-                       "Cannot use reproducer when generating one.");
+  assert((!value || !m_generate_reproducer) &&
+         "Cannot use reproducer when generating one.");
   m_use_reproducer = value;
 }
 
@@ -56,7 +56,7 @@ Reproducer::Generator::~Generator() {
 }
 
 Reproducer::Provider &Reproducer::Generator::Register(
-    std::unique_ptr<Reproducer::Provider> &&provider) {
+    std::unique_ptr<Reproducer::Provider> provider) {
   std::lock_guard<std::mutex> lock(m_providers_mutex);
 
   AddProviderToIndex(provider->GetInfo());
