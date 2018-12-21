@@ -72,6 +72,7 @@ add_lldb_library(liblldb SHARED
   SBVariablesOptions.cpp
   SBWatchpoint.cpp
   SBUnixSignals.cpp
+  SBReproducer.cpp
   SystemInitializerFull.cpp
   ${LLDB_WRAP_PYTHON}
 

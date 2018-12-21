@@ -9,6 +9,7 @@
 
 #include "lldb/API/SBCommandReturnObject.h"
 #include "lldb/API/SBError.h"
+#include "lldb/API/SBReproducer.h"
 #include "lldb/API/SBStream.h"
 
 #include "lldb/Interpreter/CommandReturnObject.h"
@@ -20,25 +21,32 @@ using namespace lldb;
 using namespace lldb_private;
 
 SBCommandReturnObject::SBCommandReturnObject()
-    : m_opaque_ap(new CommandReturnObject()) {}
+    : m_opaque_ap(new CommandReturnObject()) {
+  RECORD(this);
+}
 
 SBCommandReturnObject::SBCommandReturnObject(const SBCommandReturnObject &rhs)
     : m_opaque_ap() {
+  RECORD(this, rhs);
   if (rhs.m_opaque_ap)
     m_opaque_ap.reset(new CommandReturnObject(*rhs.m_opaque_ap));
 }
 
 SBCommandReturnObject::SBCommandReturnObject(CommandReturnObject *ptr)
-    : m_opaque_ap(ptr) {}
+    : m_opaque_ap(ptr) {
+  RECORD(this, ptr);
+}
 
 SBCommandReturnObject::~SBCommandReturnObject() = default;
 
 CommandReturnObject *SBCommandReturnObject::Release() {
+  RECORD(this);
   return m_opaque_ap.release();
 }
 
 const SBCommandReturnObject &SBCommandReturnObject::
 operator=(const SBCommandReturnObject &rhs) {
+  RECORD(this, rhs);
   if (this != &rhs) {
     if (rhs.m_opaque_ap)
       m_opaque_ap.reset(new CommandReturnObject(*rhs.m_opaque_ap));
@@ -48,7 +56,10 @@ operator=(const SBCommandReturnObject &rhs) {
   return *this;
 }
 
-bool SBCommandReturnObject::IsValid() const { return m_opaque_ap != nullptr; }
+bool SBCommandReturnObject::IsValid() const {
+  RECORD(this);
+  return m_opaque_ap != nullptr;
+}
 
 const char *SBCommandReturnObject::GetOutput() {
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));

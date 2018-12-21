@@ -11,11 +11,13 @@
 #include <limits.h>
 
 #include "lldb/API/SBFileSpec.h"
+#include "lldb/API/SBReproducer.h"
 #include "lldb/API/SBStream.h"
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Host/PosixApi.h"
 #include "lldb/Utility/FileSpec.h"
 #include "lldb/Utility/Log.h"
+#include "lldb/Utility/Reproducer.h"
 #include "lldb/Utility/Stream.h"
 
 #include "llvm/ADT/SmallString.h"
@@ -23,21 +25,29 @@
 using namespace lldb;
 using namespace lldb_private;
 
-SBFileSpec::SBFileSpec() : m_opaque_ap(new lldb_private::FileSpec()) {}
+SBFileSpec::SBFileSpec() : m_opaque_ap(new lldb_private::FileSpec()) {
+  RECORD(this);
+}
 
 SBFileSpec::SBFileSpec(const SBFileSpec &rhs)
-    : m_opaque_ap(new lldb_private::FileSpec(*rhs.m_opaque_ap)) {}
+    : m_opaque_ap(new lldb_private::FileSpec(*rhs.m_opaque_ap)) {
+  RECORD(this, rhs);
+}
 
 SBFileSpec::SBFileSpec(const lldb_private::FileSpec &fspec)
-    : m_opaque_ap(new lldb_private::FileSpec(fspec)) {}
+    : m_opaque_ap(new lldb_private::FileSpec(fspec)) {
+  RECORD(this, fspec);
+}
 
 // Deprecated!!!
 SBFileSpec::SBFileSpec(const char *path) : m_opaque_ap(new FileSpec(path)) {
+  RECORD(this, path);
   FileSystem::Instance().Resolve(*m_opaque_ap);
 }
 
 SBFileSpec::SBFileSpec(const char *path, bool resolve)
     : m_opaque_ap(new FileSpec(path)) {
+  RECORD(this, path, resolve);
   if (resolve)
     FileSystem::Instance().Resolve(*m_opaque_ap);
 }
@@ -45,14 +55,19 @@ SBFileSpec::SBFileSpec(const char *path, bool resolve)
 SBFileSpec::~SBFileSpec() {}
 
 const SBFileSpec &SBFileSpec::operator=(const SBFileSpec &rhs) {
+  RECORD(this, rhs);
   if (this != &rhs)
     *m_opaque_ap = *rhs.m_opaque_ap;
-  return *this;
+  return RECORD_RETURN(*this);
 }
 
-bool SBFileSpec::IsValid() const { return m_opaque_ap->operator bool(); }
+bool SBFileSpec::IsValid() const {
+  RECORD(this);
+  return m_opaque_ap->operator bool();
+}
 
 bool SBFileSpec::Exists() const {
+  RECORD(this);
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   bool result = FileSystem::Instance().Exists(*m_opaque_ap);
@@ -66,11 +81,13 @@ bool SBFileSpec::Exists() const {
 }
 
 bool SBFileSpec::ResolveExecutableLocation() {
+  RECORD(this);
   return FileSystem::Instance().ResolveExecutableLocation(*m_opaque_ap);
 }
 
 int SBFileSpec::ResolvePath(const char *src_path, char *dst_path,
                             size_t dst_len) {
+  RECORD(src_path, dst_path, dst_len);
   llvm::SmallString<64> result(src_path);
   FileSystem::Instance().Resolve(result);
   ::snprintf(dst_path, dst_len, "%s", result.c_str());
@@ -78,6 +95,7 @@ int SBFileSpec::ResolvePath(const char *src_path, char *dst_path,
 }
 
 const char *SBFileSpec::GetFilename() const {
+  RECORD(this);
   const char *s = m_opaque_ap->GetFilename().AsCString();
 
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
@@ -94,6 +112,7 @@ const char *SBFileSpec::GetFilename() const {
 }
 
 const char *SBFileSpec::GetDirectory() const {
+  RECORD(this);
   FileSpec directory{*m_opaque_ap};
   directory.GetFilename().Clear();
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
@@ -110,6 +129,7 @@ const char *SBFileSpec::GetDirectory() const {
 }
 
 void SBFileSpec::SetFilename(const char *filename) {
+  RECORD(this, filename);
   if (filename && filename[0])
     m_opaque_ap->GetFilename().SetCString(filename);
   else
@@ -117,6 +137,7 @@ void SBFileSpec::SetFilename(const char *filename) {
 }
 
 void SBFileSpec::SetDirectory(const char *directory) {
+  RECORD(this, directory);
   if (directory && directory[0])
     m_opaque_ap->GetDirectory().SetCString(directory);
   else
@@ -124,6 +145,7 @@ void SBFileSpec::SetDirectory(const char *directory) {
 }
 
 uint32_t SBFileSpec::GetPath(char *dst_path, size_t dst_len) const {
+  RECORD(this, dst_path, dst_len);
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   uint32_t result = m_opaque_ap->GetPath(dst_path, dst_len);
@@ -140,24 +162,32 @@ uint32_t SBFileSpec::GetPath(char *dst_path, size_t dst_len) const {
 }
 
 const lldb_private::FileSpec *SBFileSpec::operator->() const {
+  RECORD(this);
   return m_opaque_ap.get();
 }
 
 const lldb_private::FileSpec *SBFileSpec::get() const {
+  RECORD(this);
   return m_opaque_ap.get();
 }
 
 const lldb_private::FileSpec &SBFileSpec::operator*() const {
+  RECORD(this);
   return *m_opaque_ap;
 }
 
-const lldb_private::FileSpec &SBFileSpec::ref() const { return *m_opaque_ap; }
+const lldb_private::FileSpec &SBFileSpec::ref() const {
+  RECORD(this);
+  return *m_opaque_ap;
+}
 
 void SBFileSpec::SetFileSpec(const lldb_private::FileSpec &fs) {
+  RECORD(this, fs);
   *m_opaque_ap = fs;
 }
 
 bool SBFileSpec::GetDescription(SBStream &description) const {
+  RECORD(this, description);
   Stream &strm = description.ref();
   char path[PATH_MAX];
   if (m_opaque_ap->GetPath(path, sizeof(path)))
@@ -166,5 +196,6 @@ bool SBFileSpec::GetDescription(SBStream &description) const {
 }
 
 void SBFileSpec::AppendPathComponent(const char *fn) {
+  RECORD(this, fn);
   m_opaque_ap->AppendPathComponent(fn);
 }

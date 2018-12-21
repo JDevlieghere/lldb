@@ -22,6 +22,7 @@
 #include "lldb/API/SBFrame.h"
 #include "lldb/API/SBListener.h"
 #include "lldb/API/SBProcess.h"
+#include "lldb/API/SBReproducer.h"
 #include "lldb/API/SBSourceManager.h"
 #include "lldb/API/SBStream.h"
 #include "lldb/API/SBStringList.h"
@@ -108,16 +109,21 @@ void SBInputReader::SetIsDone(bool) {}
 
 bool SBInputReader::IsActive() const { return false; }
 
-SBDebugger::SBDebugger() = default;
+SBDebugger::SBDebugger() { RECORD(this); }
 
 SBDebugger::SBDebugger(const lldb::DebuggerSP &debugger_sp)
-    : m_opaque_sp(debugger_sp) {}
+    : m_opaque_sp(debugger_sp) {
+  RECORD(this);
+}
 
-SBDebugger::SBDebugger(const SBDebugger &rhs) : m_opaque_sp(rhs.m_opaque_sp) {}
+SBDebugger::SBDebugger(const SBDebugger &rhs) : m_opaque_sp(rhs.m_opaque_sp) {
+  RECORD(this, rhs);
+}
 
 SBDebugger::~SBDebugger() = default;
 
 SBDebugger &SBDebugger::operator=(const SBDebugger &rhs) {
+  RECORD(this, rhs);
   if (this != &rhs) {
     m_opaque_sp = rhs.m_opaque_sp;
   }
@@ -160,17 +166,20 @@ void SBDebugger::Clear() {
 }
 
 SBDebugger SBDebugger::Create() {
-  return SBDebugger::Create(false, nullptr, nullptr);
+  RECORD_STATIC;
+  return RECORD_RETURN(SBDebugger::Create(false, nullptr, nullptr));
 }
 
 SBDebugger SBDebugger::Create(bool source_init_files) {
-  return SBDebugger::Create(source_init_files, nullptr, nullptr);
+  RECORD(source_init_files);
+  return RECORD_RETURN(SBDebugger::Create(source_init_files, nullptr, nullptr));
 }
 
 SBDebugger SBDebugger::Create(bool source_init_files,
                               lldb::LogOutputCallback callback, void *baton)
 
 {
+  RECORD(source_init_files, callback, baton);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   SBDebugger debugger;
@@ -203,7 +212,7 @@ SBDebugger SBDebugger::Create(bool source_init_files,
     interp.get()->SkipLLDBInitFiles(true);
     interp.get()->SkipAppInitFiles(true);
   }
-  return debugger;
+  return RECORD_RETURN(debugger);
 }
 
 void SBDebugger::Destroy(SBDebugger &debugger) {
@@ -239,23 +248,30 @@ void SBDebugger::MemoryPressureDetected() {
   ModuleList::RemoveOrphanSharedModules(mandatory);
 }
 
-bool SBDebugger::IsValid() const { return m_opaque_sp.get() != nullptr; }
+bool SBDebugger::IsValid() const {
+  RECORD(this);
+  return m_opaque_sp.get() != nullptr;
+}
 
 void SBDebugger::SetAsync(bool b) {
+  RECORD(this, b);
   if (m_opaque_sp)
     m_opaque_sp->SetAsyncExecution(b);
 }
 
 bool SBDebugger::GetAsync() {
+  RECORD(this);
   return (m_opaque_sp ? m_opaque_sp->GetAsyncExecution() : false);
 }
 
 void SBDebugger::SkipLLDBInitFiles(bool b) {
+  RECORD(this, b);
   if (m_opaque_sp)
     m_opaque_sp->GetCommandInterpreter().SkipLLDBInitFiles(b);
 }
 
 void SBDebugger::SkipAppInitFiles(bool b) {
+  RECORD(this, b);
   if (m_opaque_sp)
     m_opaque_sp->GetCommandInterpreter().SkipAppInitFiles(b);
 }
@@ -303,6 +319,7 @@ void SBDebugger::SetErrorFileHandle(FILE *fh, bool transfer_ownership) {
 }
 
 FILE *SBDebugger::GetInputFileHandle() {
+  RECORD(this);
   if (m_opaque_sp) {
     StreamFileSP stream_file_sp(m_opaque_sp->GetInputFile());
     if (stream_file_sp)
@@ -312,6 +329,7 @@ FILE *SBDebugger::GetInputFileHandle() {
 }
 
 FILE *SBDebugger::GetOutputFileHandle() {
+  RECORD(this);
   if (m_opaque_sp) {
     StreamFileSP stream_file_sp(m_opaque_sp->GetOutputFile());
     if (stream_file_sp)
@@ -321,6 +339,7 @@ FILE *SBDebugger::GetOutputFileHandle() {
 }
 
 FILE *SBDebugger::GetErrorFileHandle() {
+  RECORD(this);
   if (m_opaque_sp) {
     StreamFileSP stream_file_sp(m_opaque_sp->GetErrorFile());
     if (stream_file_sp)
@@ -330,15 +349,19 @@ FILE *SBDebugger::GetErrorFileHandle() {
 }
 
 void SBDebugger::SaveInputTerminalState() {
+  RECORD(this);
   if (m_opaque_sp)
     m_opaque_sp->SaveInputTerminalState();
 }
 
 void SBDebugger::RestoreInputTerminalState() {
+  RECORD(this);
   if (m_opaque_sp)
     m_opaque_sp->RestoreInputTerminalState();
 }
+
 SBCommandInterpreter SBDebugger::GetCommandInterpreter() {
+  RECORD(this);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   SBCommandInterpreter sb_interpreter;
@@ -351,10 +374,11 @@ SBCommandInterpreter SBDebugger::GetCommandInterpreter() {
         static_cast<void *>(m_opaque_sp.get()),
         static_cast<void *>(sb_interpreter.get()));
 
-  return sb_interpreter;
+  return RECORD_RETURN(sb_interpreter);
 }
 
 void SBDebugger::HandleCommand(const char *command) {
+  RECORD(this, command);
   if (m_opaque_sp) {
     TargetSP target_sp(m_opaque_sp->GetSelectedTarget());
     std::unique_lock<std::recursive_mutex> lock;
@@ -928,6 +952,7 @@ void SBDebugger::PushInputReader(SBInputReader &reader) {}
 
 void SBDebugger::RunCommandInterpreter(bool auto_handle_events,
                                        bool spawn_thread) {
+  RECORD(this, auto_handle_events, spawn_thread);
   if (m_opaque_sp) {
     CommandInterpreterRunOptions options;
 
@@ -943,6 +968,8 @@ void SBDebugger::RunCommandInterpreter(bool auto_handle_events,
                                        bool &stopped_for_crash)
 
 {
+  RECORD(this, auto_handle_events, spawn_thread, options, num_errors,
+         quit_requested, stopped_for_crash);
   if (m_opaque_sp) {
     CommandInterpreter &interp = m_opaque_sp->GetCommandInterpreter();
     interp.RunCommandInterpreter(auto_handle_events, spawn_thread,

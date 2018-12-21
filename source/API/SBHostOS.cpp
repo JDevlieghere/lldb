@@ -13,6 +13,7 @@
 
 #include "lldb/API/SBError.h"
 #include "lldb/API/SBHostOS.h"
+#include "lldb/API/SBReproducer.h"
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Host/Host.h"
 #include "lldb/Host/HostInfo.h"
@@ -83,6 +84,7 @@ SBFileSpec SBHostOS::GetLLDBPath(lldb::PathType path_type) {
 }
 
 SBFileSpec SBHostOS::GetUserHomeDirectory() {
+  RECORD_STATIC;
   SBFileSpec sb_fspec;
 
   llvm::SmallString<64> home_dir_path;
@@ -91,7 +93,8 @@ SBFileSpec SBHostOS::GetUserHomeDirectory() {
   FileSystem::Instance().Resolve(homedir);
 
   sb_fspec.SetFileSpec(homedir);
-  return sb_fspec;
+
+  return RECORD_RETURN(sb_fspec);
 }
 
 lldb::thread_t SBHostOS::ThreadCreate(const char *name,

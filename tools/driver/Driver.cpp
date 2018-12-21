@@ -14,6 +14,7 @@
 #include "lldb/API/SBDebugger.h"
 #include "lldb/API/SBHostOS.h"
 #include "lldb/API/SBLanguageRuntime.h"
+#include "lldb/API/SBReproducer.h"
 #include "lldb/API/SBStream.h"
 #include "lldb/API/SBStringList.h"
 
@@ -271,6 +272,7 @@ SBError Driver::ProcessArgs(const opt::InputArgList &args, bool &exiting) {
     auto arg_value = arg->getValue();
     SBFileSpec file(arg_value);
     if (!file.Exists()) {
+      GenerateReproducer();
       error.SetErrorStringWithFormat(
           "file specified in --core (-c) option doesn't exist: '%s'",
           arg_value);
@@ -918,6 +920,9 @@ main(int argc, char const *argv[])
   signal(SIGTSTP, sigtstp_handler);
   signal(SIGCONT, sigcont_handler);
 #endif
+
+  if (ReplayReproducer())
+    return 0;
 
   int exit_code = 0;
   // Create a scope for driver so that the driver object will destroy itself
