@@ -28,6 +28,8 @@
 
 namespace lldb_private {
 
+class CommandProvider;
+
 class CommandInterpreterRunOptions {
 public:
   //------------------------------------------------------------------
@@ -606,6 +608,9 @@ private:
   uint32_t m_num_errors;
   bool m_quit_requested;
   bool m_stopped_for_crash;
+
+  // Reproducer provider.
+  CommandProvider *m_provider = nullptr;
 
   // The exit code the user has requested when calling the 'quit' command.
   // No value means the user hasn't set a custom exit code so far.

@@ -45,6 +45,7 @@
 #include "lldb/Core/PluginManager.h"
 #include "lldb/Core/StreamFile.h"
 #include "lldb/Utility/Log.h"
+#include "lldb/Utility/Reproducer.h"
 #include "lldb/Utility/State.h"
 #include "lldb/Utility/Stream.h"
 #include "lldb/Utility/Timer.h"
@@ -74,6 +75,7 @@
 
 using namespace lldb;
 using namespace lldb_private;
+using namespace llvm;
 
 static const char *k_white_space = " \t\v";
 
@@ -116,6 +118,42 @@ enum {
   eEchoCommentCommands = 5
 };
 
+class lldb_private::CommandProvider
+    : public repro::Provider<lldb_private::CommandProvider> {
+public:
+  CommandProvider(const FileSpec &directory) : Provider(directory) {
+    m_info.name = "command-interpreter";
+    m_info.files.push_back("command-interpreter.txt");
+  }
+
+  void CaptureCommand(std::string command) {
+    m_commands.push_back(std::move(command));
+  }
+
+  void Keep() override {
+    FileSpec file =
+        GetRoot().CopyByAppendingPathComponent("command-interpreter.txt");
+
+    std::error_code ec;
+    llvm::raw_fd_ostream os(file.GetPath(), ec, llvm::sys::fs::F_Text);
+
+    if (ec)
+      return;
+
+    for (auto &command : m_commands)
+      os << command << '\n';
+  }
+
+  void Discard() override {}
+
+  static char ID;
+
+private:
+  std::vector<std::string> m_commands;
+};
+
+char CommandProvider::ID = 0;
+
 ConstString &CommandInterpreter::GetStaticBroadcasterClass() {
   static ConstString class_name("lldb.commandInterpreter");
   return class_name;
@@ -141,6 +179,9 @@ CommandInterpreter::CommandInterpreter(Debugger &debugger,
   SetEventName(eBroadcastBitQuitCommandReceived, "quit");
   CheckInWithManager();
   m_collection_sp->Initialize(g_properties);
+
+  if (repro::Generator *g = repro::Reproducer::Instance().GetGenerator())
+    m_provider = &g->GetOrCreate<CommandProvider>();
 }
 
 bool CommandInterpreter::GetExpandRegexAliases() const {
@@ -1688,6 +1729,9 @@ bool CommandInterpreter::HandleCommand(const char *command_line,
   }
 
   Status error(PreprocessCommand(command_string));
+
+  if (m_provider)
+    m_provider->CaptureCommand(original_command_string);
 
   if (error.Fail()) {
     result.AppendError(error.AsCString());
