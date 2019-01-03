@@ -10,10 +10,32 @@
 #include "lldb/API/SBReproducer.h"
 #include "lldb/API/LLDB.h"
 
+#include "lldb/Host/FileSystem.h"
+#include "lldb/Utility/FileSpec.h"
+
 using namespace lldb;
 using namespace lldb_private::repro;
 using namespace lldb_private;
 using namespace llvm;
+
+static FileSpec GetCommandFile() {
+  repro::Loader *loader = repro::Reproducer::Instance().GetLoader();
+  if (!loader) {
+    return {};
+  }
+
+  auto provider_info = loader->GetProviderInfo("command-interpreter");
+  if (!provider_info) {
+    return {};
+  }
+
+  if (provider_info->files.empty()) {
+    return {};
+  }
+
+  return loader->GetRoot().CopyByAppendingPathComponent(
+      provider_info->files.front());
+}
 
 #define REGISTER(function, implementation)                                     \
   {                                                                            \
@@ -91,6 +113,15 @@ void SBReplayer::Init() {
             s.Read<int>(); // return
             t->SetStopOnError(a);
           };
+
+  REGISTER("void lldb::SBCommandInterpreterRunOptions::SetStopOnCrash(bool)", {
+    auto t =
+        m_index_to_object.GetObjectForIndex<SBCommandInterpreterRunOptions>(
+            s.Read<int>());
+    auto a = s.Read<bool>();
+    s.Read<int>(); // return
+    t->SetStopOnCrash(a);
+  });
 
   m_functions["lldb::SBCommandInterpreter::SBCommandInterpreter(lldb_private::"
               "CommandInterpreter *)"] = [&](SBDeserializer &s) {
@@ -243,9 +274,46 @@ void SBReplayer::Init() {
         auto d = s.Read<int>();
         auto e = s.Read<bool>();
         auto f = s.Read<bool>();
-
+        s.Read<int>(); // return
         t->RunCommandInterpreter(a, b, *c, d, e, f);
       });
+
+  REGISTER("void lldb::SBDebugger::SetErrorFileHandle(FILE *, bool)", {
+    auto t =
+        m_index_to_object.GetObjectForIndex<SBDebugger>(s.Read<int>()); // this
+    s.Read<int>();
+    s.Read<bool>();
+    s.Read<int>(); // return
+
+    // Do nothing.
+  });
+
+  REGISTER("void lldb::SBDebugger::SetOutputFileHandle(FILE *, bool)", {
+    auto t =
+        m_index_to_object.GetObjectForIndex<SBDebugger>(s.Read<int>()); // this
+    s.Read<int>();
+    s.Read<bool>();
+    s.Read<int>(); // return
+
+    // Do nothing.
+  });
+
+  REGISTER("void lldb::SBDebugger::SetInputFileHandle(FILE *, bool)", {
+    auto t =
+        m_index_to_object.GetObjectForIndex<SBDebugger>(s.Read<int>()); // this
+    s.Read<int>();
+    s.Read<bool>();
+    s.Read<int>(); // return
+
+    FileSpec fs = GetCommandFile();
+    if (!fs)
+      return;
+
+    FILE *f = FileSystem::Instance().Fopen(fs.GetPath().c_str(), "r");
+    if (f == nullptr)
+      return;
+    t->SetInputFileHandle(f, true);
+  });
 
   llvm::outs() << "Registered " << m_functions.size() << " functions\n";
 #if 0

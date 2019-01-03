@@ -280,6 +280,7 @@ void SBDebugger::SkipAppInitFiles(bool b) {
 // of problems; don't want users trying to switch modes in the middle of a
 // debugging session.
 void SBDebugger::SetInputFileHandle(FILE *fh, bool transfer_ownership) {
+  RECORD(this, fh, transfer_ownership);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -293,6 +294,7 @@ void SBDebugger::SetInputFileHandle(FILE *fh, bool transfer_ownership) {
 }
 
 void SBDebugger::SetOutputFileHandle(FILE *fh, bool transfer_ownership) {
+  RECORD(this, fh, transfer_ownership);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -306,6 +308,7 @@ void SBDebugger::SetOutputFileHandle(FILE *fh, bool transfer_ownership) {
 }
 
 void SBDebugger::SetErrorFileHandle(FILE *fh, bool transfer_ownership) {
+  RECORD(this, fh, transfer_ownership);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
