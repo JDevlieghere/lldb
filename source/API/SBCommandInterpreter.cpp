@@ -31,79 +31,79 @@ using namespace lldb;
 using namespace lldb_private;
 
 SBCommandInterpreterRunOptions::SBCommandInterpreterRunOptions() {
-  RECORD(this);
+  SB_RECORD(this);
   m_opaque_up.reset(new CommandInterpreterRunOptions());
 }
 
 SBCommandInterpreterRunOptions::~SBCommandInterpreterRunOptions() = default;
 
 bool SBCommandInterpreterRunOptions::GetStopOnContinue() const {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_up->GetStopOnContinue();
 }
 
 void SBCommandInterpreterRunOptions::SetStopOnContinue(bool stop_on_continue) {
-  RECORD(this, stop_on_continue);
+  SB_RECORD(this, stop_on_continue);
   m_opaque_up->SetStopOnContinue(stop_on_continue);
 }
 
 bool SBCommandInterpreterRunOptions::GetStopOnError() const {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_up->GetStopOnError();
 }
 
 void SBCommandInterpreterRunOptions::SetStopOnError(bool stop_on_error) {
-  RECORD(this, stop_on_error);
+  SB_RECORD(this, stop_on_error);
   m_opaque_up->SetStopOnError(stop_on_error);
 }
 
 bool SBCommandInterpreterRunOptions::GetStopOnCrash() const {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_up->GetStopOnCrash();
 }
 
 void SBCommandInterpreterRunOptions::SetStopOnCrash(bool stop_on_crash) {
-  RECORD(this, stop_on_crash);
+  SB_RECORD(this, stop_on_crash);
   m_opaque_up->SetStopOnCrash(stop_on_crash);
 }
 
 bool SBCommandInterpreterRunOptions::GetEchoCommands() const {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_up->GetEchoCommands();
 }
 
 void SBCommandInterpreterRunOptions::SetEchoCommands(bool echo_commands) {
-  RECORD(this, echo_commands);
+  SB_RECORD(this, echo_commands);
   m_opaque_up->SetEchoCommands(echo_commands);
 }
 
 bool SBCommandInterpreterRunOptions::GetEchoCommentCommands() const {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_up->GetEchoCommentCommands();
 }
 
 void SBCommandInterpreterRunOptions::SetEchoCommentCommands(bool echo) {
-  RECORD(this, echo);
+  SB_RECORD(this, echo);
   m_opaque_up->SetEchoCommentCommands(echo);
 }
 
 bool SBCommandInterpreterRunOptions::GetPrintResults() const {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_up->GetPrintResults();
 }
 
 void SBCommandInterpreterRunOptions::SetPrintResults(bool print_results) {
-  RECORD(this, print_results);
+  SB_RECORD(this, print_results);
   m_opaque_up->SetPrintResults(print_results);
 }
 
 bool SBCommandInterpreterRunOptions::GetAddToHistory() const {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_up->GetAddToHistory();
 }
 
 void SBCommandInterpreterRunOptions::SetAddToHistory(bool add_to_history) {
-  RECORD(this, add_to_history);
+  SB_RECORD(this, add_to_history);
   m_opaque_up->SetAddToHistory(add_to_history);
 }
 
@@ -145,7 +145,7 @@ protected:
 
 SBCommandInterpreter::SBCommandInterpreter(CommandInterpreter *interpreter)
     : m_opaque_ptr(interpreter) {
-  RECORD(this, interpreter);
+  SB_RECORD(this, interpreter);
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -157,47 +157,47 @@ SBCommandInterpreter::SBCommandInterpreter(CommandInterpreter *interpreter)
 
 SBCommandInterpreter::SBCommandInterpreter(const SBCommandInterpreter &rhs)
     : m_opaque_ptr(rhs.m_opaque_ptr) {
-  RECORD(this, rhs);
+  SB_RECORD(this, rhs);
 }
 
 SBCommandInterpreter::~SBCommandInterpreter() = default;
 
 const SBCommandInterpreter &SBCommandInterpreter::
 operator=(const SBCommandInterpreter &rhs) {
-  RECORD(this, rhs);
+  SB_RECORD(this, rhs);
   m_opaque_ptr = rhs.m_opaque_ptr;
   return *this;
 }
 
 bool SBCommandInterpreter::IsValid() const {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_ptr != nullptr;
 }
 
 bool SBCommandInterpreter::CommandExists(const char *cmd) {
-  RECORD(this);
+  SB_RECORD(this);
   return (((cmd != nullptr) && IsValid()) ? m_opaque_ptr->CommandExists(cmd)
                                           : false);
 }
 
 bool SBCommandInterpreter::AliasExists(const char *cmd) {
-  RECORD(this, cmd);
+  SB_RECORD(this, cmd);
   return (((cmd != nullptr) && IsValid()) ? m_opaque_ptr->AliasExists(cmd)
                                           : false);
 }
 
 bool SBCommandInterpreter::IsActive() {
-  RECORD(this);
+  SB_RECORD(this);
   return (IsValid() ? m_opaque_ptr->IsActive() : false);
 }
 
 bool SBCommandInterpreter::WasInterrupted() const {
-  RECORD(this);
+  SB_RECORD(this);
   return (IsValid() ? m_opaque_ptr->WasInterrupted() : false);
 }
 
 const char *SBCommandInterpreter::GetIOHandlerControlSequence(char ch) {
-  RECORD(this, ch);
+  SB_RECORD(this, ch);
   return (IsValid()
               ? m_opaque_ptr->GetDebugger()
                     .GetTopIOHandlerControlSequence(ch)
@@ -209,7 +209,7 @@ lldb::ReturnStatus
 SBCommandInterpreter::HandleCommand(const char *command_line,
                                     SBCommandReturnObject &result,
                                     bool add_to_history) {
-  RECORD(this, command_line, result, add_to_history);
+  SB_RECORD(this, command_line, result, add_to_history);
   SBExecutionContext sb_exe_ctx;
   return HandleCommand(command_line, sb_exe_ctx, result, add_to_history);
 }
@@ -217,7 +217,7 @@ SBCommandInterpreter::HandleCommand(const char *command_line,
 lldb::ReturnStatus SBCommandInterpreter::HandleCommand(
     const char *command_line, SBExecutionContext &override_context,
     SBCommandReturnObject &result, bool add_to_history) {
-  RECORD(this, command_line, result, add_to_history);
+  SB_RECORD(this, command_line, result, add_to_history);
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -264,7 +264,7 @@ void SBCommandInterpreter::HandleCommandsFromFile(
     lldb::SBFileSpec &file, lldb::SBExecutionContext &override_context,
     lldb::SBCommandInterpreterRunOptions &options,
     lldb::SBCommandReturnObject result) {
-  RECORD(this, file, override_context, options, result);
+  SB_RECORD(this, file, override_context, options, result);
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log) {
@@ -304,8 +304,8 @@ void SBCommandInterpreter::HandleCommandsFromFile(
 int SBCommandInterpreter::HandleCompletion(
     const char *current_line, const char *cursor, const char *last_char,
     int match_start_point, int max_return_elements, SBStringList &matches) {
-  RECORD(this, current_line, cursor, last_char, match_start_point,
-         max_return_elements, matches);
+  SB_RECORD(this, current_line, cursor, last_char, match_start_point,
+            max_return_elements, matches);
   SBStringList dummy_descriptions;
   return HandleCompletionWithDescriptions(
       current_line, cursor, last_char, match_start_point, max_return_elements,
@@ -365,8 +365,8 @@ int SBCommandInterpreter::HandleCompletionWithDescriptions(
     const char *current_line, uint32_t cursor_pos, int match_start_point,
     int max_return_elements, SBStringList &matches,
     SBStringList &descriptions) {
-  RECORD(this, current_line, cursor_pos, match_start_point, max_return_elements,
-         matches);
+  SB_RECORD(this, current_line, cursor_pos, match_start_point,
+            max_return_elements, matches);
   const char *cursor = current_line + cursor_pos;
   const char *last_char = current_line + strlen(current_line);
   return HandleCompletionWithDescriptions(
@@ -379,8 +379,8 @@ int SBCommandInterpreter::HandleCompletion(const char *current_line,
                                            int match_start_point,
                                            int max_return_elements,
                                            lldb::SBStringList &matches) {
-  RECORD(this, current_line, cursor_pos, match_start_point, max_return_elements,
-         matches);
+  SB_RECORD(this, current_line, cursor_pos, match_start_point,
+            max_return_elements, matches);
   const char *cursor = current_line + cursor_pos;
   const char *last_char = current_line + strlen(current_line);
   return HandleCompletion(current_line, cursor, last_char, match_start_point,
@@ -388,22 +388,22 @@ int SBCommandInterpreter::HandleCompletion(const char *current_line,
 }
 
 bool SBCommandInterpreter::HasCommands() {
-  RECORD(this);
+  SB_RECORD(this);
   return (IsValid() ? m_opaque_ptr->HasCommands() : false);
 }
 
 bool SBCommandInterpreter::HasAliases() {
-  RECORD(this);
+  SB_RECORD(this);
   return (IsValid() ? m_opaque_ptr->HasAliases() : false);
 }
 
 bool SBCommandInterpreter::HasAliasOptions() {
-  RECORD(this);
+  SB_RECORD(this);
   return (IsValid() ? m_opaque_ptr->HasAliasOptions() : false);
 }
 
 SBProcess SBCommandInterpreter::GetProcess() {
-  RECORD(this);
+  SB_RECORD(this);
   SBProcess sb_process;
   ProcessSP process_sp;
   if (IsValid()) {
@@ -425,7 +425,7 @@ SBProcess SBCommandInterpreter::GetProcess() {
 }
 
 SBDebugger SBCommandInterpreter::GetDebugger() {
-  RECORD(this);
+  SB_RECORD(this);
   SBDebugger sb_debugger;
   if (IsValid())
     sb_debugger.reset(m_opaque_ptr->GetDebugger().shared_from_this());
@@ -440,24 +440,24 @@ SBDebugger SBCommandInterpreter::GetDebugger() {
 }
 
 bool SBCommandInterpreter::GetPromptOnQuit() {
-  RECORD(this);
+  SB_RECORD(this);
   return (IsValid() ? m_opaque_ptr->GetPromptOnQuit() : false);
 }
 
 void SBCommandInterpreter::SetPromptOnQuit(bool b) {
-  RECORD(this, b);
+  SB_RECORD(this, b);
   if (IsValid())
     m_opaque_ptr->SetPromptOnQuit(b);
 }
 
 void SBCommandInterpreter::AllowExitCodeOnQuit(bool allow) {
-  RECORD(this, allow);
+  SB_RECORD(this, allow);
   if (m_opaque_ptr)
     m_opaque_ptr->AllowExitCodeOnQuit(allow);
 }
 
 bool SBCommandInterpreter::HasCustomQuitExitCode() {
-  RECORD(this);
+  SB_RECORD(this);
   bool exited = false;
   if (m_opaque_ptr)
     m_opaque_ptr->GetQuitExitCode(exited);
@@ -465,14 +465,14 @@ bool SBCommandInterpreter::HasCustomQuitExitCode() {
 }
 
 int SBCommandInterpreter::GetQuitStatus() {
-  RECORD(this);
+  SB_RECORD(this);
   bool exited = false;
   return (m_opaque_ptr ? m_opaque_ptr->GetQuitExitCode(exited) : 0);
 }
 
 void SBCommandInterpreter::ResolveCommand(const char *command_line,
                                           SBCommandReturnObject &result) {
-  RECORD(this, command_line, result);
+  SB_RECORD(this, command_line, result);
   result.Clear();
   if (command_line && IsValid()) {
     m_opaque_ptr->ResolveCommand(command_line, result.ref());
@@ -484,25 +484,25 @@ void SBCommandInterpreter::ResolveCommand(const char *command_line,
 }
 
 CommandInterpreter *SBCommandInterpreter::get() {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_ptr;
 }
 
 CommandInterpreter &SBCommandInterpreter::ref() {
-  RECORD(this);
+  SB_RECORD(this);
   assert(m_opaque_ptr);
   return *m_opaque_ptr;
 }
 
 void SBCommandInterpreter::reset(
     lldb_private::CommandInterpreter *interpreter) {
-  RECORD(this);
+  SB_RECORD(this);
   m_opaque_ptr = interpreter;
 }
 
 void SBCommandInterpreter::SourceInitFileInHomeDirectory(
     SBCommandReturnObject &result) {
-  RECORD(this, result);
+  SB_RECORD(this, result);
   result.Clear();
   if (IsValid()) {
     TargetSP target_sp(m_opaque_ptr->GetDebugger().GetSelectedTarget());
@@ -525,7 +525,7 @@ void SBCommandInterpreter::SourceInitFileInHomeDirectory(
 
 void SBCommandInterpreter::SourceInitFileInCurrentWorkingDirectory(
     SBCommandReturnObject &result) {
-  RECORD(this, result);
+  SB_RECORD(this, result);
   result.Clear();
   if (IsValid()) {
     TargetSP target_sp(m_opaque_ptr->GetDebugger().GetSelectedTarget());
@@ -547,7 +547,7 @@ void SBCommandInterpreter::SourceInitFileInCurrentWorkingDirectory(
 }
 
 SBBroadcaster SBCommandInterpreter::GetBroadcaster() {
-  RECORD(this);
+  SB_RECORD(this);
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   SBBroadcaster broadcaster(m_opaque_ptr, false);
@@ -562,25 +562,25 @@ SBBroadcaster SBCommandInterpreter::GetBroadcaster() {
 }
 
 const char *SBCommandInterpreter::GetBroadcasterClass() {
-  RECORD_STATIC;
+  SB_RECORD_NO_ARGS;
   return CommandInterpreter::GetStaticBroadcasterClass().AsCString();
 }
 
 const char *SBCommandInterpreter::GetArgumentTypeAsCString(
     const lldb::CommandArgumentType arg_type) {
-  RECORD(arg_type);
+  SB_RECORD(arg_type);
   return CommandObject::GetArgumentTypeAsCString(arg_type);
 }
 
 const char *SBCommandInterpreter::GetArgumentDescriptionAsCString(
     const lldb::CommandArgumentType arg_type) {
-  RECORD(arg_type);
+  SB_RECORD(arg_type);
   return CommandObject::GetArgumentDescriptionAsCString(arg_type);
 }
 
 bool SBCommandInterpreter::EventIsCommandInterpreterEvent(
     const lldb::SBEvent &event) {
-  RECORD(event);
+  SB_RECORD(event);
   return event.GetBroadcasterClass() ==
          SBCommandInterpreter::GetBroadcasterClass();
 }
@@ -588,7 +588,7 @@ bool SBCommandInterpreter::EventIsCommandInterpreterEvent(
 bool SBCommandInterpreter::SetCommandOverrideCallback(
     const char *command_name, lldb::CommandOverrideCallback callback,
     void *baton) {
-  RECORD(this, command_name, callback, baton);
+  SB_RECORD(this, command_name, callback, baton);
   if (command_name && command_name[0] && IsValid()) {
     llvm::StringRef command_name_str = command_name;
     CommandObject *cmd_obj =
@@ -604,7 +604,7 @@ bool SBCommandInterpreter::SetCommandOverrideCallback(
 
 lldb::SBCommand SBCommandInterpreter::AddMultiwordCommand(const char *name,
                                                           const char *help) {
-  RECORD(this, name, help);
+  SB_RECORD(this, name, help);
   CommandObjectMultiword *new_command =
       new CommandObjectMultiword(*m_opaque_ptr, name, help);
   new_command->SetRemovable(true);
@@ -617,7 +617,7 @@ lldb::SBCommand SBCommandInterpreter::AddMultiwordCommand(const char *name,
 
 lldb::SBCommand SBCommandInterpreter::AddCommand(
     const char *name, lldb::SBCommandPluginInterface *impl, const char *help) {
-  RECORD(this, name, impl, help);
+  SB_RECORD(this, name, impl, help);
   lldb::CommandObjectSP new_command_sp;
   new_command_sp.reset(new CommandPluginInterfaceImplementation(
       *m_opaque_ptr, name, impl, help));
@@ -632,7 +632,7 @@ lldb::SBCommand
 SBCommandInterpreter::AddCommand(const char *name,
                                  lldb::SBCommandPluginInterface *impl,
                                  const char *help, const char *syntax) {
-  RECORD(this, name, impl, help, syntax);
+  SB_RECORD(this, name, impl, help, syntax);
   lldb::CommandObjectSP new_command_sp;
   new_command_sp.reset(new CommandPluginInterfaceImplementation(
       *m_opaque_ptr, name, impl, help, syntax));

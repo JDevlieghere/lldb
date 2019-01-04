@@ -22,31 +22,31 @@ using namespace lldb_private;
 
 SBCommandReturnObject::SBCommandReturnObject()
     : m_opaque_ap(new CommandReturnObject()) {
-  RECORD(this);
+  SB_RECORD(this);
 }
 
 SBCommandReturnObject::SBCommandReturnObject(const SBCommandReturnObject &rhs)
     : m_opaque_ap() {
-  RECORD(this, rhs);
+  SB_RECORD(this, rhs);
   if (rhs.m_opaque_ap)
     m_opaque_ap.reset(new CommandReturnObject(*rhs.m_opaque_ap));
 }
 
 SBCommandReturnObject::SBCommandReturnObject(CommandReturnObject *ptr)
     : m_opaque_ap(ptr) {
-  RECORD(this, ptr);
+  SB_RECORD(this, ptr);
 }
 
 SBCommandReturnObject::~SBCommandReturnObject() = default;
 
 CommandReturnObject *SBCommandReturnObject::Release() {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_ap.release();
 }
 
 const SBCommandReturnObject &SBCommandReturnObject::
 operator=(const SBCommandReturnObject &rhs) {
-  RECORD(this, rhs);
+  SB_RECORD(this, rhs);
   if (this != &rhs) {
     if (rhs.m_opaque_ap)
       m_opaque_ap.reset(new CommandReturnObject(*rhs.m_opaque_ap));
@@ -57,7 +57,7 @@ operator=(const SBCommandReturnObject &rhs) {
 }
 
 bool SBCommandReturnObject::IsValid() const {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_ap != nullptr;
 }
 

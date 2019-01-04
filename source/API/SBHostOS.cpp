@@ -84,7 +84,7 @@ SBFileSpec SBHostOS::GetLLDBPath(lldb::PathType path_type) {
 }
 
 SBFileSpec SBHostOS::GetUserHomeDirectory() {
-  RECORD_STATIC;
+  SB_RECORD_NO_ARGS;
   SBFileSpec sb_fspec;
 
   llvm::SmallString<64> home_dir_path;
@@ -94,7 +94,7 @@ SBFileSpec SBHostOS::GetUserHomeDirectory() {
 
   sb_fspec.SetFileSpec(homedir);
 
-  return RECORD_RETURN(sb_fspec);
+  return SB_RECORD_RETURN(sb_fspec);
 }
 
 lldb::thread_t SBHostOS::ThreadCreate(const char *name,

@@ -70,6 +70,7 @@ protected:
 
   /// Every provider keeps track of its own files.
   ProviderInfo m_info;
+
 private:
   /// Every provider knows where to dump its potential files.
   FileSpec m_root;
@@ -194,6 +195,115 @@ private:
 
   mutable std::mutex m_mutex;
 };
+
+class SBObjectToIndex {
+public:
+  SBObjectToIndex() : m_index(0) {}
+
+  template <typename T> unsigned GetIndexForObject(T *t) {
+    return GetIndexForObjectImpl((void *)t);
+  }
+
+private:
+  unsigned GetIndexForObjectImpl(void *object);
+  unsigned Increment();
+
+  unsigned m_index;
+  std::mutex m_mutex;
+  llvm::DenseMap<void *, unsigned> m_mapping;
+};
+
+class SBIndexToObject {
+public:
+  template <typename T> T *GetObjectForIndex(int index) {
+    void *object = GetObjectForIndexImpl(index);
+    return static_cast<T *>(object);
+  }
+
+  template <typename T> void AddObjectForIndex(int index, T *object) {
+    AddObjectForIndexImpl(index, static_cast<void *>(object));
+  }
+
+  template <typename T> void AddObjectForIndex(int index, T &object) {
+    AddObjectForIndexImpl(index, static_cast<void *>(&object));
+  }
+
+private:
+  void *GetObjectForIndexImpl(int index);
+  void AddObjectForIndexImpl(int index, void *object);
+
+  llvm::DenseMap<unsigned, void *> m_mapping;
+};
+
+class SBSerializer {
+public:
+  SBSerializer(llvm::raw_ostream &stream) : m_stream(stream) {}
+
+  void Serialize() {}
+
+  template <typename T, typename... Ts>
+  void Serialize(const T &t, const Ts &... ts) {
+    Write(t);
+    Serialize(ts...);
+  }
+
+private:
+  template <typename T> void Write(T *t) {
+    int idx = m_tracker.GetIndexForObject(t);
+    Write(idx);
+  }
+
+  template <typename T> void Write(T &t) {
+    int idx = m_tracker.GetIndexForObject(&t);
+    Write(idx);
+  }
+
+  void Write(std::string t);
+  void Write(const char *t);
+
+#define SB_SERIALIZER_POD(Type)                                                \
+  void Write(Type t) {                                                         \
+    m_stream.write(reinterpret_cast<const char *>(&t), sizeof(Type));          \
+  }
+
+  SB_SERIALIZER_POD(bool);
+  SB_SERIALIZER_POD(char);
+  SB_SERIALIZER_POD(double);
+  SB_SERIALIZER_POD(float);
+  SB_SERIALIZER_POD(int);
+  SB_SERIALIZER_POD(long long);
+  SB_SERIALIZER_POD(long);
+  SB_SERIALIZER_POD(short);
+  SB_SERIALIZER_POD(unsigned char);
+  SB_SERIALIZER_POD(unsigned int);
+  SB_SERIALIZER_POD(unsigned long long);
+  SB_SERIALIZER_POD(unsigned long);
+  SB_SERIALIZER_POD(unsigned short);
+
+private:
+  llvm::raw_ostream &m_stream;
+  SBObjectToIndex m_tracker;
+};
+
+class SBDeserializer {
+public:
+  SBDeserializer(llvm::StringRef buffer) : m_buffer(buffer), m_offset(0) {}
+
+  template <typename T> T Read() {
+    T t;
+    std::memcpy((char *)&t, &m_buffer.data()[m_offset], sizeof(t));
+    m_offset += sizeof(t);
+    return t;
+  }
+
+  bool HasData(int offset = 0);
+
+private:
+  llvm::StringRef m_buffer;
+  uint32_t m_offset;
+};
+
+template <> const char *SBDeserializer::Read<const char *>();
 
 } // namespace repro
 } // namespace lldb_private

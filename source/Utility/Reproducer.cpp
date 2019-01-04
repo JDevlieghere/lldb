@@ -221,5 +221,51 @@ llvm::Optional<ProviderInfo> Loader::GetProviderInfo(StringRef name) {
   return it->second;
 }
 
+unsigned SBObjectToIndex::GetIndexForObjectImpl(void *object) {
+  auto it = m_mapping.find(object);
+  if (it == m_mapping.end())
+    m_mapping[object] = Increment();
+  return m_mapping[object];
+}
+
+unsigned SBObjectToIndex::Increment() {
+  std::lock_guard<std::mutex> guard(m_mutex);
+  return ++m_index;
+}
+
+void *SBIndexToObject::GetObjectForIndexImpl(int index) {
+  auto it = m_mapping.find(index);
+  if (it == m_mapping.end()) {
+    return nullptr;
+  }
+  return m_mapping[index];
+}
+
+void SBIndexToObject::AddObjectForIndexImpl(int index, void *object) {
+  if (index == -1)
+    return;
+  m_mapping[index] = object;
+}
+
+void SBSerializer::Write(std::string t) { Write(t.c_str()); }
+
+void SBSerializer::Write(const char *t) {
+  m_stream << t;
+  m_stream.write(0x0);
+}
+
+bool SBDeserializer::HasData(int offset) {
+  return m_offset + offset < m_buffer.size();
+}
+
+template <> const char *SBDeserializer::Read<const char *>() {
+  auto pos = m_buffer.find('\0', m_offset);
+  if (pos == llvm::StringRef::npos)
+    return nullptr;
+  size_t begin = m_offset;
+  m_offset = pos + 1;
+  return m_buffer.data() + begin;
+}
+
 void ProviderBase::anchor() {}
 char ProviderBase::ID = 0;

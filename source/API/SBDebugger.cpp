@@ -109,21 +109,21 @@ void SBInputReader::SetIsDone(bool) {}
 
 bool SBInputReader::IsActive() const { return false; }
 
-SBDebugger::SBDebugger() { RECORD(this); }
+SBDebugger::SBDebugger() { SB_RECORD(this); }
 
 SBDebugger::SBDebugger(const lldb::DebuggerSP &debugger_sp)
     : m_opaque_sp(debugger_sp) {
-  RECORD(this);
+  SB_RECORD(this);
 }
 
 SBDebugger::SBDebugger(const SBDebugger &rhs) : m_opaque_sp(rhs.m_opaque_sp) {
-  RECORD(this, rhs);
+  SB_RECORD(this, rhs);
 }
 
 SBDebugger::~SBDebugger() = default;
 
 SBDebugger &SBDebugger::operator=(const SBDebugger &rhs) {
-  RECORD(this, rhs);
+  SB_RECORD(this, rhs);
   if (this != &rhs) {
     m_opaque_sp = rhs.m_opaque_sp;
   }
@@ -166,20 +166,21 @@ void SBDebugger::Clear() {
 }
 
 SBDebugger SBDebugger::Create() {
-  RECORD_STATIC;
-  return RECORD_RETURN(SBDebugger::Create(false, nullptr, nullptr));
+  SB_RECORD_NO_ARGS;
+  return SB_RECORD_RETURN(SBDebugger::Create(false, nullptr, nullptr));
 }
 
 SBDebugger SBDebugger::Create(bool source_init_files) {
-  RECORD(source_init_files);
-  return RECORD_RETURN(SBDebugger::Create(source_init_files, nullptr, nullptr));
+  SB_RECORD(source_init_files);
+  return SB_RECORD_RETURN(
+      SBDebugger::Create(source_init_files, nullptr, nullptr));
 }
 
 SBDebugger SBDebugger::Create(bool source_init_files,
                               lldb::LogOutputCallback callback, void *baton)
 
 {
-  RECORD(source_init_files, callback, baton);
+  SB_RECORD(source_init_files, callback, baton);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   SBDebugger debugger;
@@ -212,7 +213,7 @@ SBDebugger SBDebugger::Create(bool source_init_files,
     interp.get()->SkipLLDBInitFiles(true);
     interp.get()->SkipAppInitFiles(true);
   }
-  return RECORD_RETURN(debugger);
+  return SB_RECORD_RETURN(debugger);
 }
 
 void SBDebugger::Destroy(SBDebugger &debugger) {
@@ -249,29 +250,29 @@ void SBDebugger::MemoryPressureDetected() {
 }
 
 bool SBDebugger::IsValid() const {
-  RECORD(this);
+  SB_RECORD(this);
   return m_opaque_sp.get() != nullptr;
 }
 
 void SBDebugger::SetAsync(bool b) {
-  RECORD(this, b);
+  SB_RECORD(this, b);
   if (m_opaque_sp)
     m_opaque_sp->SetAsyncExecution(b);
 }
 
 bool SBDebugger::GetAsync() {
-  RECORD(this);
+  SB_RECORD(this);
   return (m_opaque_sp ? m_opaque_sp->GetAsyncExecution() : false);
 }
 
 void SBDebugger::SkipLLDBInitFiles(bool b) {
-  RECORD(this, b);
+  SB_RECORD(this, b);
   if (m_opaque_sp)
     m_opaque_sp->GetCommandInterpreter().SkipLLDBInitFiles(b);
 }
 
 void SBDebugger::SkipAppInitFiles(bool b) {
-  RECORD(this, b);
+  SB_RECORD(this, b);
   if (m_opaque_sp)
     m_opaque_sp->GetCommandInterpreter().SkipAppInitFiles(b);
 }
@@ -280,7 +281,7 @@ void SBDebugger::SkipAppInitFiles(bool b) {
 // of problems; don't want users trying to switch modes in the middle of a
 // debugging session.
 void SBDebugger::SetInputFileHandle(FILE *fh, bool transfer_ownership) {
-  RECORD(this, fh, transfer_ownership);
+  SB_RECORD(this, fh, transfer_ownership);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -294,7 +295,7 @@ void SBDebugger::SetInputFileHandle(FILE *fh, bool transfer_ownership) {
 }
 
 void SBDebugger::SetOutputFileHandle(FILE *fh, bool transfer_ownership) {
-  RECORD(this, fh, transfer_ownership);
+  SB_RECORD(this, fh, transfer_ownership);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -308,7 +309,7 @@ void SBDebugger::SetOutputFileHandle(FILE *fh, bool transfer_ownership) {
 }
 
 void SBDebugger::SetErrorFileHandle(FILE *fh, bool transfer_ownership) {
-  RECORD(this, fh, transfer_ownership);
+  SB_RECORD(this, fh, transfer_ownership);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -322,7 +323,7 @@ void SBDebugger::SetErrorFileHandle(FILE *fh, bool transfer_ownership) {
 }
 
 FILE *SBDebugger::GetInputFileHandle() {
-  RECORD(this);
+  SB_RECORD(this);
   if (m_opaque_sp) {
     StreamFileSP stream_file_sp(m_opaque_sp->GetInputFile());
     if (stream_file_sp)
@@ -332,7 +333,7 @@ FILE *SBDebugger::GetInputFileHandle() {
 }
 
 FILE *SBDebugger::GetOutputFileHandle() {
-  RECORD(this);
+  SB_RECORD(this);
   if (m_opaque_sp) {
     StreamFileSP stream_file_sp(m_opaque_sp->GetOutputFile());
     if (stream_file_sp)
@@ -342,7 +343,7 @@ FILE *SBDebugger::GetOutputFileHandle() {
 }
 
 FILE *SBDebugger::GetErrorFileHandle() {
-  RECORD(this);
+  SB_RECORD(this);
   if (m_opaque_sp) {
     StreamFileSP stream_file_sp(m_opaque_sp->GetErrorFile());
     if (stream_file_sp)
@@ -352,19 +353,19 @@ FILE *SBDebugger::GetErrorFileHandle() {
 }
 
 void SBDebugger::SaveInputTerminalState() {
-  RECORD(this);
+  SB_RECORD(this);
   if (m_opaque_sp)
     m_opaque_sp->SaveInputTerminalState();
 }
 
 void SBDebugger::RestoreInputTerminalState() {
-  RECORD(this);
+  SB_RECORD(this);
   if (m_opaque_sp)
     m_opaque_sp->RestoreInputTerminalState();
 }
 
 SBCommandInterpreter SBDebugger::GetCommandInterpreter() {
-  RECORD(this);
+  SB_RECORD(this);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   SBCommandInterpreter sb_interpreter;
@@ -377,11 +378,11 @@ SBCommandInterpreter SBDebugger::GetCommandInterpreter() {
         static_cast<void *>(m_opaque_sp.get()),
         static_cast<void *>(sb_interpreter.get()));
 
-  return RECORD_RETURN(sb_interpreter);
+  return SB_RECORD_RETURN(sb_interpreter);
 }
 
 void SBDebugger::HandleCommand(const char *command) {
-  RECORD(this, command);
+  SB_RECORD(this, command);
   if (m_opaque_sp) {
     TargetSP target_sp(m_opaque_sp->GetSelectedTarget());
     std::unique_lock<std::recursive_mutex> lock;
@@ -955,7 +956,7 @@ void SBDebugger::PushInputReader(SBInputReader &reader) {}
 
 void SBDebugger::RunCommandInterpreter(bool auto_handle_events,
                                        bool spawn_thread) {
-  RECORD(this, auto_handle_events, spawn_thread);
+  SB_RECORD(this, auto_handle_events, spawn_thread);
   if (m_opaque_sp) {
     CommandInterpreterRunOptions options;
 
@@ -971,8 +972,8 @@ void SBDebugger::RunCommandInterpreter(bool auto_handle_events,
                                        bool &stopped_for_crash)
 
 {
-  RECORD(this, auto_handle_events, spawn_thread, options, num_errors,
-         quit_requested, stopped_for_crash);
+  SB_RECORD(this, auto_handle_events, spawn_thread, options, num_errors,
+            quit_requested, stopped_for_crash);
   if (m_opaque_sp) {
     CommandInterpreter &interp = m_opaque_sp->GetCommandInterpreter();
     interp.RunCommandInterpreter(auto_handle_events, spawn_thread,
