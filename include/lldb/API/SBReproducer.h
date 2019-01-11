@@ -96,14 +96,17 @@ public:
 
   template <typename T> void HandleReplayResult(const T &t) {
     unsigned result = Deserialize<unsigned>();
-    if (!std::is_fundamental<T>::value)
-      m_index_to_object.AddObjectForIndex(result, &t);
+    if (std::is_fundamental<T>::value)
+      return;
+    // We need to make a copy as the original object might go out of scope.
+    m_index_to_object.AddObjectForIndex(result, new T(t));
   }
 
   template <typename T> void HandleReplayResult(T *t) {
     unsigned result = Deserialize<unsigned>();
-    if (!std::is_fundamental<T>::value)
-      m_index_to_object.AddObjectForIndex(result, t);
+    if (std::is_fundamental<T>::value)
+      return;
+    m_index_to_object.AddObjectForIndex(result, t);
   }
 
   void HandleReplayResultVoid() {
