@@ -97,9 +97,8 @@ bool SBRegistry::Replay() {
     return true;
 }
 
-template <>
-const char *SBDeserializer::Read<const char *>(std::true_type, std::false_type,
-                                               std::false_type) {
+template <> const char *SBDeserializer::Deserialize<const char *>() {
+  TRACE;
   auto pos = m_buffer.find('\0', m_offset);
   if (pos == llvm::StringRef::npos)
     return nullptr;

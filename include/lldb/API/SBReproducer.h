@@ -28,10 +28,10 @@
 #include <type_traits>
 
 #define TRACE                                                                  \
-  { llvm::outs() << __PRETTY_FUNCTION__ << '\n'; }
+  llvm::outs() << __PRETTY_FUNCTION__ << " (line " << __LINE__ << ')' << '\n'
 
-#define TRACE_VALUE(value)                                                     \
-  { llvm::outs() << __PRETTY_FUNCTION__ << ' ' << value << '\n'; }
+template <class T> struct remove_const { typedef T type; };
+template <class T> struct remove_const<const T> { typedef T type; };
 
 namespace lldb {
 class SBIndexToObject {
@@ -42,11 +42,15 @@ public:
   }
 
   template <typename T> void AddObjectForIndex(int idx, T *object) {
-    AddObjectForIndexImpl(idx, static_cast<void *>(object));
+    AddObjectForIndexImpl(
+        idx, static_cast<void *>(
+                 const_cast<typename remove_const<T>::type *>(object)));
   }
 
   template <typename T> void AddObjectForIndex(int idx, T &object) {
-    AddObjectForIndexImpl(idx, static_cast<void *>(&object));
+    AddObjectForIndexImpl(
+        idx, static_cast<void *>(
+                 const_cast<typename remove_const<T>::type *>(&object)));
   }
 
 private:
@@ -55,13 +59,28 @@ private:
     if (it == m_mapping.end()) {
       return nullptr;
     }
+    llvm::outs() << "Mapping object to index: " << idx << " -> "
+                 << m_mapping[idx] << '\n';
     return m_mapping[idx];
   }
 
-  void AddObjectForIndexImpl(int idx, void *object) { m_mapping[idx] = object; }
+  void AddObjectForIndexImpl(int idx, void *object) {
+    llvm::outs() << "Adding object to index: " << object << " -> " << idx
+                 << '\n';
+    m_mapping[idx] = object;
+  }
 
   llvm::DenseMap<unsigned, void *> m_mapping;
 };
+
+template <unsigned> struct SBTag {};
+typedef SBTag<0> PointerTag;
+typedef SBTag<1> ReferenceTag;
+typedef SBTag<2> ValueTag;
+
+template <class T> struct serializer_tag { typedef ValueTag type; };
+template <class T> struct serializer_tag<T *> { typedef PointerTag type; };
+template <class T> struct serializer_tag<T &> { typedef ReferenceTag type; };
 
 class SBDeserializer {
 public:
@@ -70,9 +89,26 @@ public:
   bool HasData(int offset = 0) { return m_offset + offset < m_buffer.size(); }
 
   template <typename T> T Deserialize() {
+    TRACE;
     // FIXME: This is bogus for pointers or references to fundamental types.
-    return Read<T>(std::is_fundamental<T>(), std::is_pointer<T>(),
-                   std::is_reference<T>());
+    return Read<T>(typename serializer_tag<T>::type());
+  }
+
+  template <typename T> void HandleReplayResult(const T &t) {
+    unsigned result = Deserialize<unsigned>();
+    if (!std::is_fundamental<T>::value)
+      m_index_to_object.AddObjectForIndex(result, &t);
+  }
+
+  template <typename T> void HandleReplayResult(T *t) {
+    unsigned result = Deserialize<unsigned>();
+    if (!std::is_fundamental<T>::value)
+      m_index_to_object.AddObjectForIndex(result, t);
+  }
+
+  void HandleReplayResultVoid() {
+    unsigned result = Deserialize<unsigned>();
+    assert(result == std::numeric_limits<unsigned>::max());
   }
 
   // FIXME: We have references to this instance stored all over the place. We
@@ -81,23 +117,20 @@ public:
   void LoadBuffer(llvm::StringRef buffer) { m_buffer = buffer; }
 
 private:
-  template <typename T>
-  T Read(std::true_type, std::false_type, std::false_type) {
+  template <typename T> T Read(ValueTag) {
     T t;
     std::memcpy((char *)&t, &m_buffer.data()[m_offset], sizeof(t));
     m_offset += sizeof(t);
     return t;
   }
 
-  template <typename T>
-  T Read(std::false_type, std::true_type, std::false_type) {
+  template <typename T> T Read(PointerTag) {
     return m_index_to_object
         .template GetObjectForIndex<typename std::remove_pointer<T>::type>(
             Deserialize<unsigned>());
   }
 
-  template <typename T>
-  T Read(std::false_type, std::false_type, std::true_type) {
+  template <typename T> T Read(ReferenceTag) {
     return *m_index_to_object.template GetObjectForIndex<
         typename std::remove_reference<T>::type>(Deserialize<unsigned>());
   }
@@ -107,9 +140,7 @@ private:
   uint32_t m_offset;
 };
 
-template <>
-const char *SBDeserializer::Read<const char *>(std::true_type, std::false_type,
-                                               std::false_type);
+template <> const char *SBDeserializer::Deserialize<const char *>();
 
 /// Helpers to auto-synthesize function replay code.
 template <typename... Remaining> struct DeserializationHelper;
@@ -154,11 +185,26 @@ struct DefaultReplayer<Result(Args...)> : public SBReplayer {
       : SBReplayer(deserializer), f(f) {}
 
   void operator()() const override {
-    DeserializationHelper<Args...>::template deserialized<Result>::doit(
-        m_deserializer, f);
+    m_deserializer.HandleReplayResult(
+        DeserializationHelper<Args...>::template deserialized<Result>::doit(
+            m_deserializer, f));
   }
 
   Result (*f)(Args...);
+};
+
+template <typename... Args>
+struct DefaultReplayer<void(Args...)> : public SBReplayer {
+  DefaultReplayer(SBDeserializer &deserializer, void (*f)(Args...))
+      : SBReplayer(deserializer), f(f) {}
+
+  void operator()() const override {
+    DeserializationHelper<Args...>::template deserialized<void>::doit(
+        m_deserializer, f);
+    m_deserializer.HandleReplayResultVoid();
+  }
+
+  void (*f)(Args...);
 };
 
 class SBObjectToIndex {
@@ -254,14 +300,14 @@ private:
   void Serialize(std::string t) { Serialize(t.c_str()); }
 
   void Serialize(const char *t) {
-    TRACE_VALUE(t);
+    TRACE << t << '\n';
     m_stream << t;
     m_stream.write(0x0);
   }
 
 #define SB_SERIALIZER_POD(Type)                                                \
   void Serialize(Type t) {                                                     \
-    TRACE_VALUE(t);                                                            \
+    TRACE << t << '\n';                                                        \
     m_stream.write(reinterpret_cast<const char *>(&t), sizeof(Type));          \
   }
 
@@ -316,14 +362,19 @@ struct invoke<void (Class::*)(Args...)> {
 
 class SBRecorder {
 public:
-  SBRecorder() : m_serializer(nullptr), m_local_boundary(false) {
+  SBRecorder(llvm::StringRef pretty_func = "")
+      : m_pretty_func(pretty_func), m_serializer(nullptr),
+        m_local_boundary(false), m_result_recorded(false) {
     if (!g_global_boundary) {
       g_global_boundary = true;
       m_local_boundary = true;
     }
   }
 
-  ~SBRecorder() { UpdateBoundary(); }
+  ~SBRecorder() {
+    UpdateBoundary();
+    RecordOmittedResult();
+  }
 
   void SetSerializer(SBSerializer &serializer) { m_serializer = &serializer; }
 
@@ -333,8 +384,8 @@ public:
     if (!ShouldCapture()) {
       return;
     }
-    TRACE;
-
+    if (!m_pretty_func.empty())
+      llvm::outs() << "Recording '" << m_pretty_func << "' \n";
     m_serializer->SerializeID(uintptr_t(f));
     m_serializer->SerializeAll(args...);
   }
@@ -345,9 +396,8 @@ public:
     if (!ShouldCapture()) {
       return;
     }
-
-    TRACE;
-
+    if (!m_pretty_func.empty())
+      llvm::outs() << "Recording '" << m_pretty_func << "' \n";
     m_serializer->SerializeID(uintptr_t(f));
     m_serializer->SerializeAll(args...);
   }
@@ -358,8 +408,19 @@ public:
     if (ShouldCapture()) {
       TRACE;
       m_serializer->SerializeAll(r);
+      m_result_recorded = true;
     }
     return r;
+  }
+
+  void RecordOmittedResult() {
+    if (m_result_recorded)
+      return;
+    if (!ShouldCapture())
+      return;
+
+    m_serializer->SerializeAll(std::numeric_limits<unsigned>::max());
+    m_result_recorded = true;
   }
 
 private:
@@ -371,8 +432,12 @@ private:
 
   bool ShouldCapture() { return m_serializer && m_local_boundary; }
 
+  // FIXME: For debugging only.
+  llvm::StringRef m_pretty_func;
+
   SBSerializer *m_serializer;
   bool m_local_boundary;
+  bool m_result_recorded;
 
   static thread_local std::atomic<bool> g_global_boundary;
 };
@@ -380,7 +445,7 @@ private:
 
 #define SB_RECORD_CONSTRUCTOR(Class, Signature, ...)                           \
   if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
-    SBRecorder sb_recorder;                                                    \
+    SBRecorder sb_recorder(__PRETTY_FUNCTION__);                               \
     sb_recorder.SetSerializer(                                                 \
         g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
     sb_recorder.Record(&construct<Class Signature>::doit, __VA_ARGS__);        \
@@ -389,7 +454,7 @@ private:
 
 #define SB_RECORD_CONSTRUCTOR_NO_ARGS(Class)                                   \
   if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
-    SBRecorder sb_recorder;                                                    \
+    SBRecorder sb_recorder(__PRETTY_FUNCTION__);                               \
     sb_recorder.SetSerializer(                                                 \
         g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
     sb_recorder.Record(&construct<Class()>::doit);                             \
@@ -397,7 +462,7 @@ private:
   }
 
 #define SB_RECORD_METHOD(Result, Class, Method, Signature, ...)                \
-  SBRecorder sb_recorder;                                                      \
+  SBRecorder sb_recorder(__PRETTY_FUNCTION__);                                 \
   if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
     sb_recorder.SetSerializer(                                                 \
         g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
@@ -407,7 +472,7 @@ private:
   }
 
 #define SB_RECORD_METHOD_CONST(Result, Class, Method, Signature, ...)          \
-  SBRecorder sb_recorder;                                                      \
+  SBRecorder sb_recorder(__PRETTY_FUNCTION__);                                 \
   if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
     sb_recorder.SetSerializer(                                                 \
         g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
@@ -418,7 +483,7 @@ private:
   }
 
 #define SB_RECORD_METHOD_NO_ARGS(Result, Class, Method)                        \
-  SBRecorder sb_recorder;                                                      \
+  SBRecorder sb_recorder(__PRETTY_FUNCTION__);                                 \
   if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
     sb_recorder.SetSerializer(                                                 \
         g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
@@ -427,7 +492,7 @@ private:
   }
 
 #define SB_RECORD_METHOD_CONST_NO_ARGS(Result, Class, Method)                  \
-  SBRecorder sb_recorder;                                                      \
+  SBRecorder sb_recorder(__PRETTY_FUNCTION__);                                 \
   if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
     sb_recorder.SetSerializer(                                                 \
         g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
@@ -437,7 +502,7 @@ private:
   }
 
 #define SB_RECORD_STATIC_METHOD(Result, Class, Method, Signature, ...)         \
-  SBRecorder sb_recorder;                                                      \
+  SBRecorder sb_recorder(__PRETTY_FUNCTION__);                                 \
   if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
     sb_recorder.SetSerializer(                                                 \
         g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
@@ -446,7 +511,7 @@ private:
   }
 
 #define SB_RECORD_STATIC_METHOD_NO_ARGS(Result, Class, Method)                 \
-  SBRecorder sb_recorder;                                                      \
+  SBRecorder sb_recorder(__PRETTY_FUNCTION__);                                 \
   if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
     sb_recorder.SetSerializer(                                                 \
         g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
