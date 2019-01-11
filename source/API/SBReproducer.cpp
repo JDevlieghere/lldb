@@ -9,6 +9,8 @@
 
 #include "lldb/API/SBReproducer.h"
 #include "lldb/API/LLDB.h"
+#include "lldb/API/SBCommandInterpreter.h"
+#include "lldb/API/SBDebugger.h"
 #include "lldb/API/SBFileSpec.h"
 #include "lldb/API/SBHostOS.h"
 
@@ -56,16 +58,61 @@ void SBRegistry::Init() {
   }
 
   // SBHostOS
-  {
-    REGISTER_STATIC_METHOD(SBFileSpec, SBHostOS, GetUserHomeDirectory, ());
-    // FIXME: Add.
-  }
+  { REGISTER_STATIC_METHOD(SBFileSpec, SBHostOS, GetUserHomeDirectory, ()); }
 
   // SBDebugger
-  // FIXME: Add.
+  {
+    REGISTER_CONSTRUCTOR(SBDebugger, ());
+    REGISTER_CONSTRUCTOR(SBDebugger, (const DebuggerSP &));
+    REGISTER_CONSTRUCTOR(SBDebugger, (const SBDebugger &));
+
+    REGISTER_METHOD(SBCommandInterpreter, SBDebugger, GetCommandInterpreter,
+                    ());
+    REGISTER_METHOD(SBDebugger &, SBDebugger, operator=,(const SBDebugger &));
+    REGISTER_METHOD(void, SBDebugger, SkipLLDBInitFiles, (bool));
+    REGISTER_METHOD(void, SBDebugger, SkipAppInitFiles, (bool));
+    REGISTER_METHOD(bool, SBDebugger, GetAsync, ());
+    REGISTER_METHOD(void, SBDebugger, SetAsync, (bool));
+    REGISTER_METHOD(void, SBDebugger, RunCommandInterpreter,
+                    (bool, bool, lldb::SBCommandInterpreterRunOptions &, int &,
+                     bool &, bool &));
+    REGISTER_METHOD(void, SBDebugger, SetErrorFileHandle, (FILE *, bool));
+    REGISTER_METHOD(void, SBDebugger, SetOutputFileHandle, (FILE *, bool));
+    REGISTER_METHOD(void, SBDebugger, SetInputFileHandle, (FILE *, bool));
+
+    REGISTER_STATIC_METHOD(SBDebugger, SBDebugger, Create, ());
+    REGISTER_STATIC_METHOD(SBDebugger, SBDebugger, Create, (bool));
+
+    // FIXME: Why is this an issue?
+#if 0
+    REGISTER_STATIC_METHOD(SBDebugger, SBDebugger, Create,
+                           (bool, lldb::LogOutputCallback, void *));
+#endif
+  }
 
   // SBCommandInterpreter
-  // FIXME: Add.
+  {
+    REGISTER_CONSTRUCTOR(SBCommandInterpreter,
+                         (lldb_private::CommandInterpreter *));
+    REGISTER_CONSTRUCTOR(SBCommandInterpreter, (SBCommandInterpreter &));
+
+    REGISTER_METHOD_CONST(bool, SBCommandInterpreter, IsValid, ());
+
+    REGISTER_METHOD(void, SBCommandInterpreter, SourceInitFileInHomeDirectory,
+                    (SBCommandReturnObject &));
+    REGISTER_METHOD(void, SBCommandInterpreter, AllowExitCodeOnQuit, (bool));
+    REGISTER_METHOD(int, SBCommandInterpreter, GetQuitStatus, ());
+  }
+
+  // SBCommandInterpreterRunOptions
+  {
+
+    REGISTER_CONSTRUCTOR(SBCommandInterpreterRunOptions, ());
+    REGISTER_METHOD(void, SBCommandInterpreterRunOptions, SetStopOnError,
+                    (bool));
+    REGISTER_METHOD(void, SBCommandInterpreterRunOptions, SetStopOnCrash,
+                    (bool));
+  }
 }
 
 bool SBRegistry::Replay() {
@@ -94,7 +141,7 @@ bool SBRegistry::Replay() {
     m_ids[id]->operator()();
   }
 
-    return true;
+  return true;
 }
 
 template <> const char *SBDeserializer::Deserialize<const char *>() {

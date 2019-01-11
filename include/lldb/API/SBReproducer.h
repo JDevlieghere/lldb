@@ -38,7 +38,7 @@ class SBIndexToObject {
 public:
   template <typename T> T *GetObjectForIndex(int idx) {
     void *object = GetObjectForIndexImpl(idx);
-    return static_cast<T *>(object);
+    return static_cast<typename remove_const<T>::type *>(object);
   }
 
   template <typename T> void AddObjectForIndex(int idx, T *object) {

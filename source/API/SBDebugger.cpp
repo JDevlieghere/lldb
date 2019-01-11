@@ -11,6 +11,7 @@
 #include "SystemInitializerFull.h"
 
 #include "lldb/API/SBDebugger.h"
+#include "lldb/API/SBReproducer.h"
 
 #include "lldb/lldb-private.h"
 
@@ -108,14 +109,18 @@ void SBInputReader::SetIsDone(bool) {}
 
 bool SBInputReader::IsActive() const { return false; }
 
-SBDebugger::SBDebugger() = default;
+SBDebugger::SBDebugger() { SB_RECORD_CONSTRUCTOR_NO_ARGS(SBDebugger); }
 
 SBDebugger::SBDebugger(const lldb::DebuggerSP &debugger_sp)
-    : m_opaque_sp(debugger_sp) {}
+    : m_opaque_sp(debugger_sp) {
+  SB_RECORD_CONSTRUCTOR(SBDebugger, (const DebuggerSP &), debugger_sp);
+}
 
-SBDebugger::SBDebugger(const SBDebugger &rhs) : m_opaque_sp(rhs.m_opaque_sp) {}
+SBDebugger::SBDebugger(const SBDebugger &rhs) : m_opaque_sp(rhs.m_opaque_sp) {
+  SB_RECORD_CONSTRUCTOR(SBDebugger, (const SBDebugger &), rhs);
+}
 
-SBDebugger::~SBDebugger() = default;
+SBDebugger::~SBDebugger() {}
 
 SBDebugger &SBDebugger::operator=(const SBDebugger &rhs) {
   if (this != &rhs) {
@@ -160,10 +165,13 @@ void SBDebugger::Clear() {
 }
 
 SBDebugger SBDebugger::Create() {
+  SB_RECORD_STATIC_METHOD_NO_ARGS(SBDebugger, SBDebugger, Create);
   return SBDebugger::Create(false, nullptr, nullptr);
 }
 
 SBDebugger SBDebugger::Create(bool source_init_files) {
+  SB_RECORD_STATIC_METHOD(SBDebugger, SBDebugger, Create, (bool),
+                          source_init_files);
   return SBDebugger::Create(source_init_files, nullptr, nullptr);
 }
 
@@ -171,6 +179,9 @@ SBDebugger SBDebugger::Create(bool source_init_files,
                               lldb::LogOutputCallback callback, void *baton)
 
 {
+  SB_RECORD_STATIC_METHOD(SBDebugger, SBDebugger, Create,
+                          (bool, lldb::LogOutputCallback, void *),
+                          source_init_files, callback, baton);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   SBDebugger debugger;
@@ -339,6 +350,8 @@ void SBDebugger::RestoreInputTerminalState() {
     m_opaque_sp->RestoreInputTerminalState();
 }
 SBCommandInterpreter SBDebugger::GetCommandInterpreter() {
+  SB_RECORD_METHOD_NO_ARGS(SBCommandInterpreter, SBDebugger,
+                           GetCommandInterpreter);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   SBCommandInterpreter sb_interpreter;
