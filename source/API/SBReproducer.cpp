@@ -68,14 +68,6 @@ void SBRegistry::Init() {
   // FIXME: Add.
 }
 
-bool SBRegistry::Capture() {
-  if (auto *g = repro::Reproducer::Instance().GetGenerator()) {
-    repro::SBProvider &p = g->GetOrCreate<repro::SBProvider>();
-    m_serializer = SBSerializer(p.GetStream());
-  }
-  return true;
-}
-
 bool SBRegistry::Replay() {
   repro::Loader *loader = repro::Reproducer::Instance().GetLoader();
   if (!loader) {

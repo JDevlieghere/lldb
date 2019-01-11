@@ -187,9 +187,50 @@ private:
   llvm::DenseMap<void *, unsigned> m_mapping;
 };
 
+class SBRegistry {
+public:
+  static SBRegistry &Instance() {
+    static SBRegistry g_registry;
+    return g_registry;
+  }
+
+  SBRegistry() : m_id(0) { Init(); }
+
+  /// Register a default replayer for a function.
+  template <typename Signature> void Register(Signature *f, unsigned ID) {
+    DoRegister(uintptr_t(f), new DefaultReplayer<Signature>(m_deserializer, f),
+               ID);
+  }
+
+  bool Replay();
+
+  unsigned GetID(uintptr_t addr) { return m_sbreplayers[addr].second; }
+
+private:
+  void Init();
+
+  /// Register the given replayer for a function (and the ID mapping).
+  void DoRegister(uintptr_t RunID, SBReplayer *replayer, unsigned id) {
+    m_sbreplayers[RunID] = std::make_pair(replayer, id);
+    m_ids[id] = replayer;
+  }
+
+  // The deserializer is inherently coupled with the registry.
+  SBDeserializer m_deserializer;
+
+  std::map<uintptr_t, std::pair<SBReplayer *, unsigned>> m_sbreplayers;
+  std::map<unsigned, SBReplayer *> m_ids;
+
+  unsigned m_id;
+};
+
 class SBSerializer {
 public:
   SBSerializer(llvm::raw_ostream &stream = llvm::outs()) : m_stream(stream) {}
+
+  void SerializeID(uintptr_t addr) {
+    SerializeAll(SBRegistry::Instance().GetID(addr));
+  }
 
   void SerializeAll() {}
 
@@ -242,47 +283,6 @@ private:
   SBObjectToIndex m_tracker;
 };
 
-class SBRegistry {
-public:
-  static SBRegistry &Instance() {
-    static SBRegistry g_registry;
-    return g_registry;
-  }
-
-  SBRegistry() : m_id(0) { Init(); }
-
-  /// Register a default replayer for a function.
-  template <typename Signature> void Register(Signature *f, unsigned ID) {
-    DoRegister(uintptr_t(f), new DefaultReplayer<Signature>(m_deserializer, f),
-               ID);
-  }
-
-  bool Capture();
-  bool Replay();
-
-  SBDeserializer &GetDeserializer() { return m_deserializer; }
-  SBSerializer &GetSerializer() { return m_serializer; }
-
-  unsigned GetID(uintptr_t addr) { return m_sbreplayers[addr].second; }
-
-private:
-  void Init();
-
-  /// Register the given replayer for a function (and the ID mapping).
-  void DoRegister(uintptr_t RunID, SBReplayer *replayer, unsigned id) {
-    m_sbreplayers[RunID] = std::make_pair(replayer, id);
-    m_ids[id] = replayer;
-  }
-
-  SBDeserializer m_deserializer;
-  SBSerializer m_serializer;
-
-  std::map<uintptr_t, std::pair<SBReplayer *, unsigned>> m_sbreplayers;
-  std::map<unsigned, SBReplayer *> m_ids;
-
-  unsigned m_id;
-};
-
 /// To be used as the "Runtime ID" of a constructor. It also invokes the
 /// constructor when called.
 template <typename Signature> struct construct;
@@ -316,10 +316,7 @@ struct invoke<void (Class::*)(Args...)> {
 
 class SBRecorder {
 public:
-  SBRecorder()
-      : m_capture(lldb_private::repro::Reproducer::Instance().GetGenerator() !=
-                  nullptr),
-        m_local_boundary(false) {
+  SBRecorder() : m_serializer(nullptr), m_local_boundary(false) {
     if (!g_global_boundary) {
       g_global_boundary = true;
       m_local_boundary = true;
@@ -327,6 +324,8 @@ public:
   }
 
   ~SBRecorder() { UpdateBoundary(); }
+
+  void SetSerializer(SBSerializer &serializer) { m_serializer = &serializer; }
 
   /// Records a single function call.
   template <typename Result, typename... FArgs, typename... RArgs>
@@ -336,9 +335,8 @@ public:
     }
     TRACE;
 
-    SBRegistry &registry = SBRegistry::Instance();
-    registry.GetSerializer().SerializeAll(registry.GetID(uintptr_t(f)));
-    registry.GetSerializer().SerializeAll(args...);
+    m_serializer->SerializeID(uintptr_t(f));
+    m_serializer->SerializeAll(args...);
   }
 
   /// Records a single function call.
@@ -347,11 +345,11 @@ public:
     if (!ShouldCapture()) {
       return;
     }
+
     TRACE;
 
-    SBRegistry &registry = SBRegistry::Instance();
-    registry.GetSerializer().SerializeAll(registry.GetID(uintptr_t(f)));
-    registry.GetSerializer().SerializeAll(args...);
+    m_serializer->SerializeID(uintptr_t(f));
+    m_serializer->SerializeAll(args...);
   }
 
   /// Record the result of a function call.
@@ -359,7 +357,7 @@ public:
     UpdateBoundary();
     if (ShouldCapture()) {
       TRACE;
-      SBRegistry::Instance().GetSerializer().SerializeAll(r);
+      m_serializer->SerializeAll(r);
     }
     return r;
   }
@@ -371,9 +369,9 @@ private:
     }
   }
 
-  bool ShouldCapture() { return m_capture && m_local_boundary; }
+  bool ShouldCapture() { return m_serializer && m_local_boundary; }
 
-  bool m_capture;
+  SBSerializer *m_serializer;
   bool m_local_boundary;
 
   static thread_local std::atomic<bool> g_global_boundary;
@@ -381,22 +379,28 @@ private:
 } // namespace lldb
 
 #define SB_RECORD_CONSTRUCTOR(Class, Signature, ...)                           \
-  {                                                                            \
+  if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
     SBRecorder sb_recorder;                                                    \
+    sb_recorder.SetSerializer(                                                 \
+        g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
     sb_recorder.Record(&construct<Class Signature>::doit, __VA_ARGS__);        \
     sb_recorder.RecordResult(this);                                            \
   }
 
 #define SB_RECORD_CONSTRUCTOR_NO_ARGS(Class)                                   \
-  {                                                                            \
+  if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
     SBRecorder sb_recorder;                                                    \
+    sb_recorder.SetSerializer(                                                 \
+        g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
     sb_recorder.Record(&construct<Class()>::doit);                             \
     sb_recorder.RecordResult(this);                                            \
   }
 
 #define SB_RECORD_METHOD(Result, Class, Method, Signature, ...)                \
   SBRecorder sb_recorder;                                                      \
-  {                                                                            \
+  if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
+    sb_recorder.SetSerializer(                                                 \
+        g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
     sb_recorder.Record(                                                        \
         &invoke<Result(Class::*) Signature>::method<&Class::Method>::doit,     \
         this, __VA_ARGS__);                                                    \
@@ -404,7 +408,9 @@ private:
 
 #define SB_RECORD_METHOD_CONST(Result, Class, Method, Signature, ...)          \
   SBRecorder sb_recorder;                                                      \
-  {                                                                            \
+  if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
+    sb_recorder.SetSerializer(                                                 \
+        g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
     sb_recorder.Record(                                                        \
         &invoke<Result(Class::*)                                               \
                     Signature const>::method_const<&Class::Method>::doit,      \
@@ -413,14 +419,18 @@ private:
 
 #define SB_RECORD_METHOD_NO_ARGS(Result, Class, Method)                        \
   SBRecorder sb_recorder;                                                      \
-  {                                                                            \
+  if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
+    sb_recorder.SetSerializer(                                                 \
+        g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
     sb_recorder.Record(                                                        \
         &invoke<Result (Class::*)()>::method<&Class::Method>::doit, this);     \
   }
 
 #define SB_RECORD_METHOD_CONST_NO_ARGS(Result, Class, Method)                  \
   SBRecorder sb_recorder;                                                      \
-  {                                                                            \
+  if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
+    sb_recorder.SetSerializer(                                                 \
+        g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
     sb_recorder.Record(&invoke<Result (Class::*)()                             \
                                    const>::method_const<&Class::Method>::doit, \
                        this);                                                  \
@@ -428,15 +438,47 @@ private:
 
 #define SB_RECORD_STATIC_METHOD(Result, Class, Method, Signature, ...)         \
   SBRecorder sb_recorder;                                                      \
-  {                                                                            \
+  if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
+    sb_recorder.SetSerializer(                                                 \
+        g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
     sb_recorder.Record(static_cast<Result(*) Signature>(&Class::Method),       \
                        __VA_ARGS__);                                           \
   }
 
 #define SB_RECORD_STATIC_METHOD_NO_ARGS(Result, Class, Method)                 \
   SBRecorder sb_recorder;                                                      \
-  { sb_recorder.Record(static_cast<Result (*)()>(&Class::Method)); }
+  if (auto *g = lldb_private::repro::Reproducer::Instance().GetGenerator()) {  \
+    sb_recorder.SetSerializer(                                                 \
+        g->GetOrCreate<repro::SBProvider>().GetSerializer());                  \
+    sb_recorder.Record(static_cast<Result (*)()>(&Class::Method));             \
+  }
 
 #define SB_RECORD_RESULT(Result) sb_recorder.RecordResult(Result);
+
+namespace lldb_private {
+namespace repro {
+
+class SBProvider : public Provider<SBProvider> {
+public:
+  SBProvider(const FileSpec &directory)
+      : Provider(directory),
+        m_stream(directory.CopyByAppendingPathComponent("sbapi.bin").GetPath(),
+                 m_ec, llvm::sys::fs::OpenFlags::F_None),
+        m_serializer(m_stream) {
+    m_info.name = "sbapi";
+    m_info.files.push_back("sbapi.bin");
+  }
+
+  lldb::SBSerializer &GetSerializer() { return m_serializer; }
+  static char ID;
+
+private:
+  std::error_code m_ec;
+  llvm::raw_fd_ostream m_stream;
+  lldb::SBSerializer m_serializer;
+};
+
+} // namespace repro
+} // namespace lldb_private
 
 #endif

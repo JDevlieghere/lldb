@@ -911,10 +911,6 @@ main(int argc, char const *argv[])
     return 1;
   }
 
-  if (!SBRegistry::Instance().Capture()) {
-    return 0;
-  }
-
   if (SBRegistry::Instance().Replay()) {
     return 0;
   }
