@@ -70,6 +70,7 @@ protected:
 
   /// Every provider keeps track of its own files.
   ProviderInfo m_info;
+
 private:
   /// Every provider knows where to dump its potential files.
   FileSpec m_root;
@@ -193,6 +194,24 @@ private:
   llvm::Optional<Loader> m_loader;
 
   mutable std::mutex m_mutex;
+};
+
+class SBProvider : public Provider<SBProvider> {
+public:
+  SBProvider(const FileSpec &directory)
+      : Provider(directory),
+        m_stream(directory.CopyByAppendingPathComponent("sbapi.bin").GetPath(),
+                 m_ec, llvm::sys::fs::OpenFlags::F_None) {
+    m_info.name = "sbapi";
+    m_info.files.push_back("sbapi.bin");
+  }
+
+  llvm::raw_fd_ostream &GetStream() { return m_stream; }
+  static char ID;
+
+private:
+  std::error_code m_ec;
+  llvm::raw_fd_ostream m_stream;
 };
 
 } // namespace repro

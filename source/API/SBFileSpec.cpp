@@ -11,6 +11,7 @@
 #include <limits.h>
 
 #include "lldb/API/SBFileSpec.h"
+#include "lldb/API/SBReproducer.h"
 #include "lldb/API/SBStream.h"
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Host/PosixApi.h"
@@ -23,21 +24,27 @@
 using namespace lldb;
 using namespace lldb_private;
 
-SBFileSpec::SBFileSpec() : m_opaque_ap(new lldb_private::FileSpec()) {}
+SBFileSpec::SBFileSpec() : m_opaque_ap(new lldb_private::FileSpec()) {
+  SB_RECORD_CONSTRUCTOR_NO_ARGS(SBFileSpec);
+}
 
 SBFileSpec::SBFileSpec(const SBFileSpec &rhs)
-    : m_opaque_ap(new lldb_private::FileSpec(*rhs.m_opaque_ap)) {}
+    : m_opaque_ap(new lldb_private::FileSpec(*rhs.m_opaque_ap)) {
+  SB_RECORD_CONSTRUCTOR(SBFileSpec, (const SBFileSpec &), rhs);
+}
 
 SBFileSpec::SBFileSpec(const lldb_private::FileSpec &fspec)
     : m_opaque_ap(new lldb_private::FileSpec(fspec)) {}
 
 // Deprecated!!!
 SBFileSpec::SBFileSpec(const char *path) : m_opaque_ap(new FileSpec(path)) {
+  SB_RECORD_CONSTRUCTOR(SBFileSpec, (const char *), path);
   FileSystem::Instance().Resolve(*m_opaque_ap);
 }
 
 SBFileSpec::SBFileSpec(const char *path, bool resolve)
     : m_opaque_ap(new FileSpec(path)) {
+  SB_RECORD_CONSTRUCTOR(SBFileSpec, (const char *, bool), path, resolve);
   if (resolve)
     FileSystem::Instance().Resolve(*m_opaque_ap);
 }
@@ -45,14 +52,20 @@ SBFileSpec::SBFileSpec(const char *path, bool resolve)
 SBFileSpec::~SBFileSpec() {}
 
 const SBFileSpec &SBFileSpec::operator=(const SBFileSpec &rhs) {
+  SB_RECORD_METHOD(const SBFileSpec &,
+                   SBFileSpec, operator=,(const SBFileSpec &), rhs);
   if (this != &rhs)
     *m_opaque_ap = *rhs.m_opaque_ap;
   return *this;
 }
 
-bool SBFileSpec::IsValid() const { return m_opaque_ap->operator bool(); }
+bool SBFileSpec::IsValid() const {
+  SB_RECORD_METHOD_CONST_NO_ARGS(bool, SBFileSpec, IsValid);
+  return m_opaque_ap->operator bool();
+}
 
 bool SBFileSpec::Exists() const {
+  SB_RECORD_METHOD_CONST_NO_ARGS(bool, SBFileSpec, IsValid);
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   bool result = FileSystem::Instance().Exists(*m_opaque_ap);
@@ -66,11 +79,15 @@ bool SBFileSpec::Exists() const {
 }
 
 bool SBFileSpec::ResolveExecutableLocation() {
+  SB_RECORD_METHOD_NO_ARGS(bool, SBFileSpec, ResolveExecutableLocation);
   return FileSystem::Instance().ResolveExecutableLocation(*m_opaque_ap);
 }
 
 int SBFileSpec::ResolvePath(const char *src_path, char *dst_path,
                             size_t dst_len) {
+  SB_RECORD_STATIC_METHOD(int, SBFileSpec, ResolvePath,
+                          (const char *, char *, size_t), src_path, dst_path,
+                          dst_len);
   llvm::SmallString<64> result(src_path);
   FileSystem::Instance().Resolve(result);
   ::snprintf(dst_path, dst_len, "%s", result.c_str());
@@ -78,6 +95,7 @@ int SBFileSpec::ResolvePath(const char *src_path, char *dst_path,
 }
 
 const char *SBFileSpec::GetFilename() const {
+  SB_RECORD_METHOD_CONST_NO_ARGS(const char *, SBFileSpec, GetFilename);
   const char *s = m_opaque_ap->GetFilename().AsCString();
 
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
@@ -94,6 +112,7 @@ const char *SBFileSpec::GetFilename() const {
 }
 
 const char *SBFileSpec::GetDirectory() const {
+  SB_RECORD_METHOD_CONST_NO_ARGS(const char *, SBFileSpec, GetDirectory);
   FileSpec directory{*m_opaque_ap};
   directory.GetFilename().Clear();
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
@@ -110,6 +129,7 @@ const char *SBFileSpec::GetDirectory() const {
 }
 
 void SBFileSpec::SetFilename(const char *filename) {
+  SB_RECORD_METHOD(void, SBFileSpec, SetFilename, (const char *), filename);
   if (filename && filename[0])
     m_opaque_ap->GetFilename().SetCString(filename);
   else
@@ -117,6 +137,7 @@ void SBFileSpec::SetFilename(const char *filename) {
 }
 
 void SBFileSpec::SetDirectory(const char *directory) {
+  SB_RECORD_METHOD(void, SBFileSpec, SetDirectory, (const char *), directory);
   if (directory && directory[0])
     m_opaque_ap->GetDirectory().SetCString(directory);
   else
@@ -124,6 +145,8 @@ void SBFileSpec::SetDirectory(const char *directory) {
 }
 
 uint32_t SBFileSpec::GetPath(char *dst_path, size_t dst_len) const {
+  SB_RECORD_METHOD_CONST(uint32_t, SBFileSpec, GetPath, (char *, size_t),
+                         dst_path, dst_len);
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   uint32_t result = m_opaque_ap->GetPath(dst_path, dst_len);
@@ -158,6 +181,8 @@ void SBFileSpec::SetFileSpec(const lldb_private::FileSpec &fs) {
 }
 
 bool SBFileSpec::GetDescription(SBStream &description) const {
+  SB_RECORD_METHOD_CONST(bool, SBFileSpec, GetDescription, (SBStream &),
+                         description);
   Stream &strm = description.ref();
   char path[PATH_MAX];
   if (m_opaque_ap->GetPath(path, sizeof(path)))
@@ -166,5 +191,6 @@ bool SBFileSpec::GetDescription(SBStream &description) const {
 }
 
 void SBFileSpec::AppendPathComponent(const char *fn) {
+  SB_RECORD_METHOD(void, SBFileSpec, AppendPathComponent, (const char *), fn);
   m_opaque_ap->AppendPathComponent(fn);
 }
