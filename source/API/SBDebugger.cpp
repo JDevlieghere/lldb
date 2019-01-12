@@ -253,20 +253,24 @@ void SBDebugger::MemoryPressureDetected() {
 bool SBDebugger::IsValid() const { return m_opaque_sp.get() != nullptr; }
 
 void SBDebugger::SetAsync(bool b) {
+  SB_RECORD_METHOD(void, SBDebugger, SetAsync, (bool), b);
   if (m_opaque_sp)
     m_opaque_sp->SetAsyncExecution(b);
 }
 
 bool SBDebugger::GetAsync() {
+  SB_RECORD_METHOD_NO_ARGS(bool, SBDebugger, GetAsync);
   return (m_opaque_sp ? m_opaque_sp->GetAsyncExecution() : false);
 }
 
 void SBDebugger::SkipLLDBInitFiles(bool b) {
+  SB_RECORD_METHOD(void, SBDebugger, SkipLLDBInitFiles, (bool), b);
   if (m_opaque_sp)
     m_opaque_sp->GetCommandInterpreter().SkipLLDBInitFiles(b);
 }
 
 void SBDebugger::SkipAppInitFiles(bool b) {
+  SB_RECORD_METHOD(void, SBDebugger, SkipAppInitFiles, (bool), b);
   if (m_opaque_sp)
     m_opaque_sp->GetCommandInterpreter().SkipAppInitFiles(b);
 }
@@ -275,6 +279,8 @@ void SBDebugger::SkipAppInitFiles(bool b) {
 // of problems; don't want users trying to switch modes in the middle of a
 // debugging session.
 void SBDebugger::SetInputFileHandle(FILE *fh, bool transfer_ownership) {
+  SB_RECORD_METHOD(void, SBDebugger, SetInputFileHandle, (FILE *, bool), fh,
+                   transfer_ownership);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -288,6 +294,8 @@ void SBDebugger::SetInputFileHandle(FILE *fh, bool transfer_ownership) {
 }
 
 void SBDebugger::SetOutputFileHandle(FILE *fh, bool transfer_ownership) {
+  SB_RECORD_METHOD(void, SBDebugger, SetOutputFileHandle, (FILE *, bool), fh,
+                   transfer_ownership);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -301,6 +309,8 @@ void SBDebugger::SetOutputFileHandle(FILE *fh, bool transfer_ownership) {
 }
 
 void SBDebugger::SetErrorFileHandle(FILE *fh, bool transfer_ownership) {
+  SB_RECORD_METHOD(void, SBDebugger, SetErrorFileHandle, (FILE *, bool), fh,
+                   transfer_ownership);
   Log *log(GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -956,6 +966,11 @@ void SBDebugger::RunCommandInterpreter(bool auto_handle_events,
                                        bool &stopped_for_crash)
 
 {
+  SB_RECORD_METHOD(void, SBDebugger, RunCommandInterpreter,
+                   (bool, bool, lldb::SBCommandInterpreterRunOptions &, int &,
+                    bool &, bool &),
+                   auto_handle_events, spawn_thread, options, num_errors,
+                   quit_requested, stopped_for_crash);
   if (m_opaque_sp) {
     CommandInterpreter &interp = m_opaque_sp->GetCommandInterpreter();
     interp.RunCommandInterpreter(auto_handle_events, spawn_thread,

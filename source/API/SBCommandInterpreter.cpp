@@ -22,6 +22,7 @@
 #include "lldb/API/SBExecutionContext.h"
 #include "lldb/API/SBListener.h"
 #include "lldb/API/SBProcess.h"
+#include "lldb/API/SBReproducer.h"
 #include "lldb/API/SBStream.h"
 #include "lldb/API/SBStringList.h"
 #include "lldb/API/SBTarget.h"
@@ -129,6 +130,8 @@ protected:
 
 SBCommandInterpreter::SBCommandInterpreter(CommandInterpreter *interpreter)
     : m_opaque_ptr(interpreter) {
+  SB_RECORD_CONSTRUCTOR(SBCommandInterpreter, (CommandInterpreter *),
+                        interpreter);
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_API));
 
   if (log)
@@ -139,7 +142,10 @@ SBCommandInterpreter::SBCommandInterpreter(CommandInterpreter *interpreter)
 }
 
 SBCommandInterpreter::SBCommandInterpreter(const SBCommandInterpreter &rhs)
-    : m_opaque_ptr(rhs.m_opaque_ptr) {}
+    : m_opaque_ptr(rhs.m_opaque_ptr) {
+  SB_RECORD_CONSTRUCTOR(SBCommandInterpreter, (const SBCommandInterpreter &),
+                        rhs);
+}
 
 SBCommandInterpreter::~SBCommandInterpreter() = default;
 
@@ -149,7 +155,10 @@ operator=(const SBCommandInterpreter &rhs) {
   return *this;
 }
 
-bool SBCommandInterpreter::IsValid() const { return m_opaque_ptr != nullptr; }
+bool SBCommandInterpreter::IsValid() const {
+  SB_RECORD_METHOD_CONST_NO_ARGS(bool, SBCommandInterpreter, IsValid);
+  return m_opaque_ptr != nullptr;
+}
 
 bool SBCommandInterpreter::CommandExists(const char *cmd) {
   return (((cmd != nullptr) && IsValid()) ? m_opaque_ptr->CommandExists(cmd)
@@ -407,6 +416,8 @@ void SBCommandInterpreter::SetPromptOnQuit(bool b) {
 }
 
 void SBCommandInterpreter::AllowExitCodeOnQuit(bool allow) {
+  SB_RECORD_METHOD(void, SBCommandInterpreter, AllowExitCodeOnQuit, (bool),
+                   allow);
   if (m_opaque_ptr)
     m_opaque_ptr->AllowExitCodeOnQuit(allow);
 }
@@ -419,6 +430,7 @@ bool SBCommandInterpreter::HasCustomQuitExitCode() {
 }
 
 int SBCommandInterpreter::GetQuitStatus() {
+  SB_RECORD_METHOD_NO_ARGS(int, SBCommandInterpreter, GetQuitStatus);
   bool exited = false;
   return (m_opaque_ptr ? m_opaque_ptr->GetQuitExitCode(exited) : 0);
 }
@@ -449,6 +461,8 @@ void SBCommandInterpreter::reset(
 
 void SBCommandInterpreter::SourceInitFileInHomeDirectory(
     SBCommandReturnObject &result) {
+  SB_RECORD_METHOD(void, SBCommandInterpreter, SourceInitFileInHomeDirectory,
+                   (SBCommandReturnObject &), result);
   result.Clear();
   if (IsValid()) {
     TargetSP target_sp(m_opaque_ptr->GetDebugger().GetSelectedTarget());
