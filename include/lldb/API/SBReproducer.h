@@ -57,6 +57,7 @@ private:
   void *GetObjectForIndexImpl(int idx) {
     auto it = m_mapping.find(idx);
     if (it == m_mapping.end()) {
+      assert(false && "Object not found. Bug in reproducer?");
       return nullptr;
     }
     llvm::outs() << "Mapping object to index: " << idx << " -> "
@@ -111,7 +112,7 @@ public:
 
   void HandleReplayResultVoid() {
     unsigned result = Deserialize<unsigned>();
-    assert(result == std::numeric_limits<unsigned>::max());
+    assert(result == 0);
   }
 
   // FIXME: We have references to this instance stored all over the place. We
@@ -212,7 +213,7 @@ struct DefaultReplayer<void(Args...)> : public SBReplayer {
 
 class SBObjectToIndex {
 public:
-  SBObjectToIndex() : m_index(0) {}
+  SBObjectToIndex() : m_index(1) {}
 
   template <typename T> unsigned GetIndexForObject(T *t) {
     return GetIndexForObjectImpl((void *)t);
@@ -243,7 +244,7 @@ public:
     return g_registry;
   }
 
-  SBRegistry() : m_id(0) { Init(); }
+  SBRegistry() : m_id(1) { Init(); }
 
   /// Register a default replayer for a function.
   template <typename Signature> void Register(Signature *f, unsigned ID) {
@@ -422,7 +423,7 @@ public:
     if (!ShouldCapture())
       return;
 
-    m_serializer->SerializeAll(std::numeric_limits<unsigned>::max());
+    m_serializer->SerializeAll(0);
     m_result_recorded = true;
   }
 

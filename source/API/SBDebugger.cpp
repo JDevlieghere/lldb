@@ -166,13 +166,14 @@ void SBDebugger::Clear() {
 
 SBDebugger SBDebugger::Create() {
   SB_RECORD_STATIC_METHOD_NO_ARGS(SBDebugger, SBDebugger, Create);
-  return SBDebugger::Create(false, nullptr, nullptr);
+  return SB_RECORD_RESULT(SBDebugger::Create(false, nullptr, nullptr));
 }
 
 SBDebugger SBDebugger::Create(bool source_init_files) {
   SB_RECORD_STATIC_METHOD(SBDebugger, SBDebugger, Create, (bool),
                           source_init_files);
-  return SBDebugger::Create(source_init_files, nullptr, nullptr);
+  return SB_RECORD_RESULT(
+      SBDebugger::Create(source_init_files, nullptr, nullptr));
 }
 
 SBDebugger SBDebugger::Create(bool source_init_files,
@@ -214,7 +215,7 @@ SBDebugger SBDebugger::Create(bool source_init_files,
     interp.get()->SkipLLDBInitFiles(true);
     interp.get()->SkipAppInitFiles(true);
   }
-  return debugger;
+  return SB_RECORD_RESULT(debugger);
 }
 
 void SBDebugger::Destroy(SBDebugger &debugger) {
