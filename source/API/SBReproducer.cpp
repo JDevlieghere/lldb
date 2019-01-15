@@ -190,9 +190,12 @@ bool SBRegistry::Replay(const FileSpec &file) {
     return false;
 
   m_deserializer.LoadBuffer((*error_or_file)->getBuffer());
+  Log *log = GetLogIfAllCategoriesSet(LIBLLDB_LOG_API);
 
   while (m_deserializer.HasData(1)) {
     unsigned id = m_deserializer.Deserialize<unsigned>();
+    if (log)
+      log->Printf("Replaying function #%u", id);
     m_ids[id]->operator()();
   }
 

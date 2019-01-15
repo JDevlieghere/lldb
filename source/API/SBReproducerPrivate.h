@@ -13,6 +13,7 @@
 #include "lldb/API/SBReproducer.h"
 
 #include "lldb/Utility/FileSpec.h"
+#include "lldb/Utility/Log.h"
 #include "lldb/Utility/Reproducer.h"
 
 #include "llvm/ADT/DenseMap.h"
@@ -448,11 +449,6 @@ class SBSerializer {
 public:
   SBSerializer(llvm::raw_ostream &stream = llvm::outs()) : m_stream(stream) {}
 
-  /// Serialize a function ID.
-  void SerializeID(uintptr_t addr) {
-    SerializeAll(SBRegistry::Instance().GetID(addr));
-  }
-
   /// Recursively serialize all the given arguments.
   template <typename Head, typename... Tail>
   void SerializeAll(const Head &head, const Tail &... tail) {
@@ -575,7 +571,13 @@ public:
     if (!ShouldCapture()) {
       return;
     }
-    m_serializer->SerializeID(uintptr_t(f));
+
+    unsigned id = SBRegistry::Instance().GetID(uintptr_t(f));
+
+    if (Log *log = GetLogIfAllCategoriesSet(LIBLLDB_LOG_API))
+      log->Printf("Recording #%u '%s'", id, m_pretty_func.data());
+
+    m_serializer->SerializeAll(id);
     m_serializer->SerializeAll(args...);
   }
 
@@ -585,7 +587,13 @@ public:
     if (!ShouldCapture()) {
       return;
     }
-    m_serializer->SerializeID(uintptr_t(f));
+
+    unsigned id = SBRegistry::Instance().GetID(uintptr_t(f));
+
+    if (Log *log = GetLogIfAllCategoriesSet(LIBLLDB_LOG_API))
+      log->Printf("Recording #%u '%s'", id, m_pretty_func.data());
+
+    m_serializer->SerializeAll(id);
     m_serializer->SerializeAll(args...);
   }
 
