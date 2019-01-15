@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SBReproducerPrivate.h"
 #include "lldb/lldb-types.h"
 
 #include "lldb/Interpreter/CommandInterpreter.h"

@@ -7,17 +7,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "lldb/API/SBReproducer.h"
+#include "SBReproducerPrivate.h"
+
 #include "lldb/API/LLDB.h"
 #include "lldb/API/SBCommandInterpreter.h"
 #include "lldb/API/SBDebugger.h"
 #include "lldb/API/SBFileSpec.h"
 #include "lldb/API/SBHostOS.h"
+#include "lldb/API/SBReproducer.h"
 
 #include "lldb/Host/FileSystem.h"
 
 using namespace lldb;
 using namespace lldb_private;
+using namespace lldb_private::repro;
 
 #define REGISTER_CONSTRUCTOR(Class, Signature)                                 \
   Register<Class * Signature>(&construct<Class Signature>::doit, m_id++)
@@ -162,7 +165,7 @@ void SBRegistry::Init() {
   { REGISTER_CONSTRUCTOR(SBCommandReturnObject, ()); }
 }
 
-bool SBRegistry::Replay() {
+bool SBReproducer::Replay() const {
   repro::Loader *loader = repro::Reproducer::Instance().GetLoader();
   if (!loader) {
     return false;
@@ -176,6 +179,12 @@ bool SBRegistry::Replay() {
   FileSpec file(loader->GetRoot());
   file.AppendPathComponent(info->files.front());
 
+  SBRegistry::Instance().Replay(file);
+
+  return true;
+}
+
+bool SBRegistry::Replay(const FileSpec &file) {
   auto error_or_file = llvm::MemoryBuffer::getFile(file.GetPath());
   if (auto err = error_or_file.getError())
     return false;
@@ -184,7 +193,6 @@ bool SBRegistry::Replay() {
 
   while (m_deserializer.HasData(1)) {
     unsigned id = m_deserializer.Deserialize<unsigned>();
-    llvm::outs() << "Replaying #" << id << "\n";
     m_ids[id]->operator()();
   }
 
@@ -192,7 +200,6 @@ bool SBRegistry::Replay() {
 }
 
 template <> const char *SBDeserializer::Deserialize<const char *>() {
-  TRACE;
   auto pos = m_buffer.find('\0', m_offset);
   if (pos == llvm::StringRef::npos)
     return nullptr;
@@ -201,5 +208,5 @@ template <> const char *SBDeserializer::Deserialize<const char *>() {
   return m_buffer.data() + begin;
 }
 
-std::atomic<bool> SBRecorder::g_global_boundary;
+std::atomic<bool> lldb_private::repro::SBRecorder::g_global_boundary;
 char lldb_private::repro::SBProvider::ID = 0;

@@ -10,6 +10,7 @@
 #include <inttypes.h>
 #include <limits.h>
 
+#include "SBReproducerPrivate.h"
 #include "lldb/API/SBFileSpec.h"
 #include "lldb/API/SBReproducer.h"
 #include "lldb/API/SBStream.h"

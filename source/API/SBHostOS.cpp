@@ -11,6 +11,7 @@
 #include "Plugins/ScriptInterpreter/Python/lldb-python.h"
 #endif
 
+#include "SBReproducerPrivate.h"
 #include "lldb/API/SBError.h"
 #include "lldb/API/SBHostOS.h"
 #include "lldb/API/SBReproducer.h"

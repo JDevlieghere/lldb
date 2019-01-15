@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-
+#include "SBReproducerPrivate.h"
 #include "SystemInitializerFull.h"
 
 #include "lldb/API/SBDebugger.h"

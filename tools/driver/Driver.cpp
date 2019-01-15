@@ -911,7 +911,8 @@ main(int argc, char const *argv[])
     return 1;
   }
 
-  if (SBRegistry::Instance().Replay()) {
+  SBReproducer reproducer;
+  if (reproducer.Replay()) {
     return 0;
   }
 
