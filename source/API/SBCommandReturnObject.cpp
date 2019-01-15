@@ -9,6 +9,7 @@
 
 #include "lldb/API/SBCommandReturnObject.h"
 #include "lldb/API/SBError.h"
+#include "lldb/API/SBReproducer.h"
 #include "lldb/API/SBStream.h"
 
 #include "lldb/Interpreter/CommandReturnObject.h"
@@ -20,7 +21,10 @@ using namespace lldb;
 using namespace lldb_private;
 
 SBCommandReturnObject::SBCommandReturnObject()
-    : m_opaque_ap(new CommandReturnObject()) {}
+    : m_opaque_ap(new CommandReturnObject()) {
+
+  SB_RECORD_CONSTRUCTOR_NO_ARGS(SBCommandReturnObject);
+}
 
 SBCommandReturnObject::SBCommandReturnObject(const SBCommandReturnObject &rhs)
     : m_opaque_ap() {

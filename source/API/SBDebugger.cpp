@@ -375,7 +375,7 @@ SBCommandInterpreter SBDebugger::GetCommandInterpreter() {
         static_cast<void *>(m_opaque_sp.get()),
         static_cast<void *>(sb_interpreter.get()));
 
-  return sb_interpreter;
+  return SB_RECORD_RESULT(sb_interpreter);
 }
 
 void SBDebugger::HandleCommand(const char *command) {

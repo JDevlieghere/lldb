@@ -14,6 +14,8 @@
 #include "lldb/API/SBFileSpec.h"
 #include "lldb/API/SBHostOS.h"
 
+#include "lldb/Host/FileSystem.h"
+
 using namespace lldb;
 using namespace lldb_private;
 
@@ -30,6 +32,40 @@ using namespace lldb_private;
 #define REGISTER_STATIC_METHOD(Result, Class, Method, Signature)               \
   Register<Result Signature>(static_cast<Result(*) Signature>(&Class::Method), \
                              m_id++)
+
+static FileSpec GetCommandFile() {
+  repro::Loader *loader = repro::Reproducer::Instance().GetLoader();
+  if (!loader) {
+    return {};
+  }
+
+  auto provider_info = loader->GetProviderInfo("command-interpreter");
+  if (!provider_info) {
+    return {};
+  }
+
+  if (provider_info->files.empty()) {
+    return {};
+  }
+
+  return loader->GetRoot().CopyByAppendingPathComponent(
+      provider_info->files.front());
+}
+
+static void SetInputFileHandleRedirect(SBDebugger *t, FILE *, bool) {
+  FileSpec fs = GetCommandFile();
+  if (!fs)
+    return;
+
+  FILE *f = FileSystem::Instance().Fopen(fs.GetPath().c_str(), "r");
+  if (f == nullptr)
+    return;
+  t->SetInputFileHandle(f, true);
+}
+
+static void SetFileHandleRedirect(SBDebugger *, FILE *, bool) {
+  // Do nothing.
+}
 
 void SBRegistry::Init() {
   // SBFileSpec
@@ -76,9 +112,17 @@ void SBRegistry::Init() {
     REGISTER_METHOD(void, SBDebugger, RunCommandInterpreter,
                     (bool, bool, lldb::SBCommandInterpreterRunOptions &, int &,
                      bool &, bool &));
-    REGISTER_METHOD(void, SBDebugger, SetErrorFileHandle, (FILE *, bool));
-    REGISTER_METHOD(void, SBDebugger, SetOutputFileHandle, (FILE *, bool));
-    REGISTER_METHOD(void, SBDebugger, SetInputFileHandle, (FILE *, bool));
+
+    // Custom implementation.
+    Register(&invoke<void (SBDebugger::*)(
+                 FILE *, bool)>::method<&SBDebugger::SetInputFileHandle>::doit,
+             m_id++, &SetInputFileHandleRedirect);
+    Register(&invoke<void (SBDebugger::*)(
+                 FILE *, bool)>::method<&SBDebugger::SetErrorFileHandle>::doit,
+             m_id++, &SetFileHandleRedirect);
+    Register(&invoke<void (SBDebugger::*)(
+                 FILE *, bool)>::method<&SBDebugger::SetOutputFileHandle>::doit,
+             m_id++, &SetFileHandleRedirect);
 
     REGISTER_STATIC_METHOD(SBDebugger, SBDebugger, Create, ());
     REGISTER_STATIC_METHOD(SBDebugger, SBDebugger, Create, (bool));
@@ -95,6 +139,7 @@ void SBRegistry::Init() {
     REGISTER_CONSTRUCTOR(SBCommandInterpreter,
                          (lldb_private::CommandInterpreter *));
     REGISTER_CONSTRUCTOR(SBCommandInterpreter, (SBCommandInterpreter &));
+    REGISTER_CONSTRUCTOR(SBCommandInterpreter, (const SBCommandInterpreter &));
 
     REGISTER_METHOD_CONST(bool, SBCommandInterpreter, IsValid, ());
 
@@ -106,13 +151,15 @@ void SBRegistry::Init() {
 
   // SBCommandInterpreterRunOptions
   {
-
     REGISTER_CONSTRUCTOR(SBCommandInterpreterRunOptions, ());
     REGISTER_METHOD(void, SBCommandInterpreterRunOptions, SetStopOnError,
                     (bool));
     REGISTER_METHOD(void, SBCommandInterpreterRunOptions, SetStopOnCrash,
                     (bool));
   }
+
+  // SBCommandReturnObject
+  { REGISTER_CONSTRUCTOR(SBCommandReturnObject, ()); }
 }
 
 bool SBRegistry::Replay() {
@@ -154,5 +201,5 @@ template <> const char *SBDeserializer::Deserialize<const char *>() {
   return m_buffer.data() + begin;
 }
 
-thread_local std::atomic<bool> SBRecorder::g_global_boundary;
+std::atomic<bool> SBRecorder::g_global_boundary;
 char lldb_private::repro::SBProvider::ID = 0;

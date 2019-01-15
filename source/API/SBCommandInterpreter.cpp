@@ -32,6 +32,7 @@ using namespace lldb_private;
 
 SBCommandInterpreterRunOptions::SBCommandInterpreterRunOptions() {
   m_opaque_up.reset(new CommandInterpreterRunOptions());
+  SB_RECORD_CONSTRUCTOR_NO_ARGS(SBCommandInterpreterRunOptions);
 }
 
 SBCommandInterpreterRunOptions::~SBCommandInterpreterRunOptions() = default;

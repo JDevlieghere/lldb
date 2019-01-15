@@ -37,6 +37,7 @@ namespace lldb {
 class SBIndexToObject {
 public:
   template <typename T> T *GetObjectForIndex(int idx) {
+    assert(idx != 0 && "Cannot get object for sentinel");
     void *object = GetObjectForIndexImpl(idx);
     return static_cast<typename remove_const<T>::type *>(object);
   }
@@ -57,7 +58,7 @@ private:
   void *GetObjectForIndexImpl(int idx) {
     auto it = m_mapping.find(idx);
     if (it == m_mapping.end()) {
-      assert(false && "Object not found. Bug in reproducer?");
+      llvm::outs() << "Mapping object to index: " << idx << " -> nullptr\n";
       return nullptr;
     }
     llvm::outs() << "Mapping object to index: " << idx << " -> "
@@ -66,6 +67,7 @@ private:
   }
 
   void AddObjectForIndexImpl(int idx, void *object) {
+    assert(idx != 0 && "Cannot add object for sentinel");
     llvm::outs() << "Adding object to index: " << object << " -> " << idx
                  << '\n';
     m_mapping[idx] = object;
@@ -211,6 +213,39 @@ struct DefaultReplayer<void(Args...)> : public SBReplayer {
   void (*f)(Args...);
 };
 
+template <typename Signature> struct ForwardingReplayer;
+template <typename Result, typename... Args>
+struct ForwardingReplayer<Result(Args...)> : public SBReplayer {
+  ForwardingReplayer(SBDeserializer &deserializer, Result (*f)(Args...),
+                     Result (*g)(Args...))
+      : SBReplayer(deserializer), f(f), g(g) {}
+
+  void operator()() const override {
+    m_deserializer.HandleReplayResult(
+        DeserializationHelper<Args...>::template deserialized<Result>::doit(
+            m_deserializer, f));
+  }
+
+  Result (*f)(Args...);
+  Result (*g)(Args...);
+};
+
+template <typename... Args>
+struct ForwardingReplayer<void(Args...)> : public SBReplayer {
+  ForwardingReplayer(SBDeserializer &deserializer, void (*f)(Args...),
+                     void (*g)(Args...))
+      : SBReplayer(deserializer), f(f), g(g) {}
+
+  void operator()() const override {
+    DeserializationHelper<Args...>::template deserialized<void>::doit(
+        m_deserializer, f);
+    m_deserializer.HandleReplayResultVoid();
+  }
+
+  void (*f)(Args...);
+  void (*g)(Args...);
+};
+
 class SBObjectToIndex {
 public:
   SBObjectToIndex() : m_index(1) {}
@@ -252,9 +287,27 @@ public:
                ID);
   }
 
+  /// Register a replayer that forwards to another function with the same
+  /// signature.
+  template <typename Signature>
+  void Register(Signature *f, unsigned ID, Signature *g) {
+    DoRegister(uintptr_t(f),
+               new ForwardingReplayer<Signature>(m_deserializer, f, g), ID);
+  }
+
+  /// Register a custom replayer for a function.
+  template <typename Signature, template <typename> class Replayer>
+  void RegisterCustom(Signature *f, unsigned ID) {
+    DoRegister(uintptr_t(f), new Replayer<Signature>(m_deserializer, f), ID);
+  }
+
   bool Replay();
 
-  unsigned GetID(uintptr_t addr) { return m_sbreplayers[addr].second; }
+  unsigned GetID(uintptr_t addr) {
+    unsigned id = m_sbreplayers[addr].second;
+    assert(id != 0);
+    return id;
+  }
 
 private:
   void Init();
@@ -443,7 +496,7 @@ private:
   bool m_local_boundary;
   bool m_result_recorded;
 
-  static thread_local std::atomic<bool> g_global_boundary;
+  static std::atomic<bool> g_global_boundary;
 };
 } // namespace lldb
 
