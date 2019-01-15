@@ -80,10 +80,20 @@ template <unsigned> struct SBTag {};
 typedef SBTag<0> PointerTag;
 typedef SBTag<1> ReferenceTag;
 typedef SBTag<2> ValueTag;
+typedef SBTag<3> FundamentalPointerTag;
+typedef SBTag<4> FundamentalReferenceTag;
 
 template <class T> struct serializer_tag { typedef ValueTag type; };
-template <class T> struct serializer_tag<T *> { typedef PointerTag type; };
-template <class T> struct serializer_tag<T &> { typedef ReferenceTag type; };
+template <class T> struct serializer_tag<T *> {
+  typedef
+      typename std::conditional<std::is_fundamental<T>::value,
+                                FundamentalPointerTag, PointerTag>::type type;
+};
+template <class T> struct serializer_tag<T &> {
+  typedef typename std::conditional<std::is_fundamental<T>::value,
+                                    FundamentalReferenceTag, ReferenceTag>::type
+      type;
+};
 
 class SBDeserializer {
 public:
@@ -131,14 +141,35 @@ private:
   }
 
   template <typename T> T Read(PointerTag) {
-    return m_index_to_object
-        .template GetObjectForIndex<typename std::remove_pointer<T>::type>(
-            Deserialize<unsigned>());
+    typedef typename std::remove_pointer<T>::type UnderlyingT;
+    return m_index_to_object.template GetObjectForIndex<UnderlyingT>(
+        Deserialize<unsigned>());
   }
 
   template <typename T> T Read(ReferenceTag) {
-    return *m_index_to_object.template GetObjectForIndex<
-        typename std::remove_reference<T>::type>(Deserialize<unsigned>());
+    typedef typename std::remove_reference<T>::type UnderlyingT;
+    // If this is a reference to a fundamental type we just read its value.
+    return *m_index_to_object.template GetObjectForIndex<UnderlyingT>(
+        Deserialize<unsigned>());
+  }
+
+  // This method is used to parse references to fundamental types. Because
+  // they're not recorded in the object table we have serialized their value.
+  // We read its value, allocate a copy on the heap, and return a pointer to
+  // the copy.
+  template <typename T> T Read(FundamentalPointerTag) {
+    typedef typename std::remove_pointer<T>::type UnderlyingT;
+    return new UnderlyingT(Deserialize<UnderlyingT>());
+  }
+
+  // This method is used to parse references to fundamental types. Because
+  // they're not recorded in the object table we have serialized their value.
+  // We read its value, allocate a copy on the heap, and return a reference to
+  // the copy.
+  template <typename T> T Read(FundamentalReferenceTag) {
+    // If this is a reference to a fundamental type we just read its value.
+    typedef typename std::remove_reference<T>::type UnderlyingT;
+    return *(new UnderlyingT(Deserialize<UnderlyingT>()));
   }
 
   llvm::StringRef m_buffer;
@@ -345,16 +376,28 @@ public:
 
 private:
   template <typename T> void Serialize(T *t) {
-    int idx = m_tracker.GetIndexForObject(t);
-    Serialize(idx);
+    if (std::is_fundamental<T>::value) {
+      Serialize(*t);
+    } else {
+      int idx = m_tracker.GetIndexForObject(t);
+      Serialize(idx);
+    }
   }
 
   template <typename T> void Serialize(T &t) {
-    int idx = m_tracker.GetIndexForObject(&t);
-    Serialize(idx);
+    if (std::is_fundamental<T>::value) {
+      Serialize(t);
+    } else {
+      int idx = m_tracker.GetIndexForObject(&t);
+      Serialize(idx);
+    }
   }
 
   void Serialize(std::string t) { Serialize(t.c_str()); }
+
+  void Serialize(void *v) {
+    // Do nothing.
+  }
 
   void Serialize(const char *t) {
     TRACE << t << '\n';
